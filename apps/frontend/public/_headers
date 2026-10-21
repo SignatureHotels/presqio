@@ -1,0 +1,17 @@
+# Security headers for Cloudflare Pages (applied to every response).
+# connect-src 'self' assumes the API is reached through /api on the same origin; add the API
+# origin (e.g. https://api.presqio.com) here if the frontend calls it directly.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), geolocation=(self), microphone=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# Reset/verify links carry a token in the URL: never leak it through the Referer header.
+/reset-password
+  Referrer-Policy: no-referrer
+/verify-email
+  Referrer-Policy: no-referrer

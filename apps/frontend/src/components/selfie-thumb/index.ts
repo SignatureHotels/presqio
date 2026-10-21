@@ -1,0 +1,1 @@
+export { SelfieThumb } from "./SelfieThumb";

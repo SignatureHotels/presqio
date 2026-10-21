@@ -1,0 +1,1 @@
+export { ProfilePlaceholder } from "./ProfilePlaceholder";

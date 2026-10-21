@@ -1,0 +1,31 @@
+{
+  "name": "presqio",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "yarn@1.22.22",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0 <26",
+    "yarn": "^1.22.22"
+  },
+  "scripts": {
+    "ui:dev": "yarn workspace @presqio/frontend dev",
+    "backend:dev": "yarn workspace @presqio/backend dev",
+    "worker:dev": "yarn workspace @presqio/worker dev",
+    "build": "yarn workspace @presqio/lib build && yarn workspace @presqio/backend build && yarn workspace @presqio/frontend build && yarn workspace @presqio/worker build",
+    "typecheck": "yarn workspace @presqio/lib build && yarn workspaces run typecheck",
+    "test": "yarn workspace @presqio/backend test && yarn workspace @presqio/frontend test",
+    "db:generate": "yarn workspace @presqio/backend db:generate",
+    "db:migrate": "yarn workspace @presqio/backend db:migrate",
+    "db:deploy": "yarn workspace @presqio/backend db:deploy",
+    "db:status": "yarn workspace @presqio/backend db:status",
+    "db:seed": "yarn workspace @presqio/backend db:seed",
+    "db:studio": "yarn workspace @presqio/backend db:studio",
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down",
+    "postinstall": "yarn workspace @presqio/lib build && yarn db:generate"
+  }
+}

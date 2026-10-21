@@ -1,0 +1,16 @@
+{
+  "name": "Presqio Attendance",
+  "short_name": "Presqio",
+  "start_url": "/employee",
+  "display": "standalone",
+  "background_color": "#FFF9EF",
+  "theme_color": "#173F35",
+  "icons": [
+    {
+      "src": "/fevicon-icon.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

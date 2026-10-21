@@ -1,0 +1,8 @@
+{
+  "name": "@presqio/config",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "node -e \"JSON.parse(require('fs').readFileSync('tsconfig.base.json'))\""
+  }
+}

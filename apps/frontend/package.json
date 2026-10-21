@@ -1,0 +1,31 @@
+{
+  "name": "@presqio/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 300 --strictPort",
+    "build": "yarn typecheck && vite build",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json && tsc -p tsconfig.test.json",
+    "preview": "vite preview --port 300 --strictPort",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^7.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.9.0",
+    "@presqio/lib": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0",
+    "tsx": "^4.20.0"
+  }
+}

@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.agents
+.codex
+.aws
+**/*.log
+coverage
+presqio_ui_prototype

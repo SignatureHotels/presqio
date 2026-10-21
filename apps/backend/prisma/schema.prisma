@@ -1,0 +1,811 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EntityStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum EmployeeStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum BusinessRole {
+  BUSINESS_ADMIN
+  BRANCH_MANAGER
+  VIEWER
+}
+
+enum OnboardingStep {
+  ORGANIZATION
+  BUSINESS
+  BRANCH
+  SHIFT
+  TEAM
+  COMPLETED
+}
+
+enum AuthTokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+enum SessionKind {
+  ADMIN
+  EMPLOYEE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum EnrollmentStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  SUPERSEDED
+}
+
+enum AttendanceAction {
+  CHECK_IN
+  CHECK_OUT
+}
+
+enum AttemptStatus {
+  INITIATED
+  CAPTURING
+  VERIFYING
+  APPROVED
+  CONSUMED
+  RETRYABLE_FAILURE
+  REVIEW_REQUIRED
+  EXPIRED
+}
+
+enum VerificationResult {
+  PASS
+  RETRY
+  REVIEW_REQUIRED
+  FAIL
+}
+
+enum AttendanceSessionStatus {
+  OPEN
+  CLOSED
+  CORRECTED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model organizations {
+  id                                            String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                          String
+  slug                                          String                     @unique
+  status                                        EntityStatus               @default(ACTIVE)
+  country                                       String                     @default("IN")
+  default_timezone                              String                     @default("Asia/Kolkata")
+  onboarding_step                               OnboardingStep             @default(ORGANIZATION)
+  onboarding_completed_at                       DateTime?                  @db.Timestamptz(3)
+  created_by                                    String?                    @db.Uuid
+  created_at                                    DateTime                   @default(now()) @db.Timestamptz(3)
+  updated_at                                    DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
+  created_by_ref                                users?                     @relation("organizations_created_by", fields: [created_by], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  subscription                                  subscriptions?             @relation("subscriptions_organization_id")
+  invitations_organization_id_rows              invitations[]              @relation("invitations_organization_id")
+  businesses_organization_id_rows               businesses[]               @relation("businesses_organization_id")
+  organization_memberships_organization_id_rows organization_memberships[] @relation("organization_memberships_organization_id")
+  audit_logs_organization_id_rows               audit_logs[]               @relation("audit_logs_organization_id")
+}
+
+model businesses {
+  id                                            String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id                               String                         @db.Uuid
+  code                                          String                         @unique
+  /// Start of this organization's employee IDs (e.g. SGH -> SGH0001). Unique platform-wide.
+  employee_prefix                               String                         @unique
+  slug                                          String
+  name                                          String
+  industry                                      String?
+  country                                       String                         @default("IN")
+  address                                       String?
+  logo_key                                      String?
+  timezone                                      String                         @default("Asia/Kolkata")
+  status                                        EntityStatus                   @default(ACTIVE)
+  created_at                                    DateTime                       @default(now()) @db.Timestamptz(3)
+  updated_at                                    DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
+  invitations_business_rows                     invitations[]                  @relation("invitations_business")
+  business_membership_branches_business_id_rows business_membership_branches[] @relation("business_membership_branches_business_id")
+  organization_id_ref                           organizations                  @relation("businesses_organization_id", fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_memberships_business_id_rows         business_memberships[]         @relation("business_memberships_business_id")
+  employees_business_id_rows                    employees[]                    @relation("employees_business_id")
+  activation_tokens_business_id_rows            activation_tokens[]            @relation("activation_tokens_business_id")
+  branches_business_id_rows                     branches[]                     @relation("branches_business_id")
+  geofences_business_id_rows                    geofences[]                    @relation("geofences_business_id")
+  employee_branch_assignments_business_id_rows  employee_branch_assignments[]  @relation("employee_branch_assignments_business_id")
+  shifts_business_id_rows                       shifts[]                       @relation("shifts_business_id")
+  shift_assignments_business_id_rows            shift_assignments[]            @relation("shift_assignments_business_id")
+  calendars_business_id_rows                    calendars[]                    @relation("calendars_business_id")
+  face_enrollments_business_id_rows             face_enrollments[]             @relation("face_enrollments_business_id")
+  attendance_attempts_business_id_rows          attendance_attempts[]          @relation("attendance_attempts_business_id")
+  face_checks_business_id_rows                  face_checks[]                  @relation("face_checks_business_id")
+  location_checks_business_id_rows              location_checks[]              @relation("location_checks_business_id")
+  attendance_sessions_business_id_rows          attendance_sessions[]          @relation("attendance_sessions_business_id")
+  attendance_events_business_id_rows            attendance_events[]            @relation("attendance_events_business_id")
+  attendance_corrections_business_id_rows       attendance_corrections[]       @relation("attendance_corrections_business_id")
+  approvals_business_id_rows                    approvals[]                    @relation("approvals_business_id")
+  attendance_adjustments_business_id_rows       attendance_adjustments[]       @relation("attendance_adjustments_business_id")
+  audit_logs_business_id_rows                   audit_logs[]                   @relation("audit_logs_business_id")
+  report_jobs_business_id_rows                  report_jobs[]                  @relation("report_jobs_business_id")
+  privacy_notices_business_id_rows              privacy_notices[]              @relation("privacy_notices_business_id")
+  privacy_acknowledgements_business_id_rows     privacy_acknowledgements[]     @relation("privacy_acknowledgements_business_id")
+  retention_jobs_business_id_rows               retention_jobs[]               @relation("retention_jobs_business_id")
+  notification_jobs_business_id_rows            notification_jobs[]            @relation("notification_jobs_business_id")
+
+  attendance_photos_business_rows attendance_photos[] @relation("attendance_photos_business")
+  leave_days_business_rows        leave_days[]        @relation("leave_days_business")
+
+  @@unique([organization_id, id])
+  @@unique([organization_id, slug])
+}
+
+model users {
+  id                                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  display_name                             String
+  /// Stored lower-cased; null for employee-only (PIN) users.
+  email                                    String?                    @unique
+  email_verified_at                        DateTime?                  @db.Timestamptz(3)
+  phone                                    String?
+  status                                   EntityStatus               @default(ACTIVE)
+  last_login_at                            DateTime?                  @db.Timestamptz(3)
+  created_at                               DateTime                   @default(now()) @db.Timestamptz(3)
+  updated_at                               DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
+  organizations_created_by_rows            organizations[]            @relation("organizations_created_by")
+  invitations_invited_by_rows              invitations[]              @relation("invitations_invited_by")
+  auth_tokens_user_id_rows                 auth_tokens[]              @relation("auth_tokens_user_id")
+  organization_memberships_user_id_rows    organization_memberships[] @relation("organization_memberships_user_id")
+  business_memberships_user_id_rows        business_memberships[]     @relation("business_memberships_user_id")
+  employees_user_id_rows                   employees[]                @relation("employees_user_id")
+  credentials_user_id_rows                 credentials[]              @relation("credentials_user_id")
+  activation_tokens_issued_by_rows         activation_tokens[]        @relation("activation_tokens_issued_by")
+  sessions_user_id_rows                    sessions[]                 @relation("sessions_user_id")
+  face_enrollments_approved_by_rows        face_enrollments[]         @relation("face_enrollments_approved_by")
+  attendance_corrections_requester_id_rows attendance_corrections[]   @relation("attendance_corrections_requester_id")
+  attendance_corrections_reviewer_id_rows  attendance_corrections[]   @relation("attendance_corrections_reviewer_id")
+  approvals_reviewer_id_rows               approvals[]                @relation("approvals_reviewer_id")
+  attendance_adjustments_approved_by_rows  attendance_adjustments[]   @relation("attendance_adjustments_approved_by")
+  audit_logs_actor_id_rows                 audit_logs[]               @relation("audit_logs_actor_id")
+  report_jobs_requested_by_rows            report_jobs[]              @relation("report_jobs_requested_by")
+  notification_jobs_user_id_rows           notification_jobs[]        @relation("notification_jobs_user_id")
+}
+
+model organization_memberships {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String           @db.Uuid
+  user_id             String           @db.Uuid
+  role                OrganizationRole @default(MEMBER)
+  status              EntityStatus     @default(ACTIVE)
+  created_at          DateTime         @default(now()) @db.Timestamptz(3)
+  organization_id_ref organizations    @relation("organization_memberships_organization_id", fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user_id_ref         users            @relation("organization_memberships_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([organization_id, user_id])
+  @@index([user_id])
+}
+
+/// Business-level access for organization MEMBERs. OWNER/ADMIN manage every business without rows here.
+model business_memberships {
+  id                String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id       String                         @db.Uuid
+  user_id           String                         @db.Uuid
+  role              BusinessRole
+  created_at        DateTime                       @default(now()) @db.Timestamptz(3)
+  user_id_ref       users                          @relation("business_memberships_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref   businesses                     @relation("business_memberships_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  branch_scope_rows business_membership_branches[] @relation("business_membership_branches_membership")
+
+  @@unique([business_id, user_id])
+  @@unique([business_id, id])
+  @@index([user_id])
+}
+
+/// Optional branch restriction for a business membership; no rows means all branches.
+model business_membership_branches {
+  business_id     String               @db.Uuid
+  membership_id   String               @db.Uuid
+  branch_id       String               @db.Uuid
+  business_id_ref businesses           @relation("business_membership_branches_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  membership_ref  business_memberships @relation("business_membership_branches_membership", fields: [business_id, membership_id], references: [business_id, id], onDelete: Cascade, onUpdate: Restrict)
+  branch_ref      branches             @relation("business_membership_branches_branch", fields: [business_id, branch_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([membership_id, branch_id])
+}
+
+model invitations {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String           @db.Uuid
+  /// Stored lower-cased.
+  email               String
+  organization_role   OrganizationRole @default(MEMBER)
+  business_id         String?          @db.Uuid
+  business_role       BusinessRole?
+  token_hash          String           @unique
+  invited_by          String           @db.Uuid
+  expires_at          DateTime         @db.Timestamptz(3)
+  accepted_at         DateTime?        @db.Timestamptz(3)
+  revoked_at          DateTime?        @db.Timestamptz(3)
+  created_at          DateTime         @default(now()) @db.Timestamptz(3)
+  organization_id_ref organizations    @relation("invitations_organization_id", fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_ref        businesses?      @relation("invitations_business", fields: [organization_id, business_id], references: [organization_id, id], onDelete: Restrict, onUpdate: Restrict)
+  invited_by_ref      users            @relation("invitations_invited_by", fields: [invited_by], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([organization_id, email])
+}
+
+model auth_tokens {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String           @db.Uuid
+  purpose     AuthTokenPurpose
+  token_hash  String           @unique
+  expires_at  DateTime         @db.Timestamptz(3)
+  consumed_at DateTime?        @db.Timestamptz(3)
+  created_at  DateTime         @default(now()) @db.Timestamptz(3)
+  user_id_ref users            @relation("auth_tokens_user_id", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@index([user_id, purpose])
+}
+
+/// Plan catalogue (seeded). Null limits mean unlimited.
+model plans {
+  code                String          @id
+  name                String
+  max_businesses      Int?
+  max_branches        Int?
+  max_employees       Int?
+  monthly_price_minor Int             @default(0)
+  currency            String          @default("INR")
+  is_public           Boolean         @default(true)
+  subscriptions_rows  subscriptions[] @relation("subscriptions_plan_code")
+}
+
+model subscriptions {
+  id                       String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id          String             @unique @db.Uuid
+  plan_code                String
+  status                   SubscriptionStatus @default(TRIALING)
+  trial_ends_at            DateTime?          @db.Timestamptz(3)
+  current_period_end       DateTime?          @db.Timestamptz(3)
+  provider                 String?
+  provider_customer_id     String?
+  provider_subscription_id String?            @unique
+  created_at               DateTime           @default(now()) @db.Timestamptz(3)
+  updated_at               DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+  organization_id_ref      organizations      @relation("subscriptions_organization_id", fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  plan_ref                 plans              @relation("subscriptions_plan_code", fields: [plan_code], references: [code], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model employees {
+  id                                           String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                                  String                        @db.Uuid
+  user_id                                      String?                       @db.Uuid
+  /// Unique across all organizations: employees sign in with just this ID.
+  employee_code                                String                        @unique
+  full_name                                    String
+  phone                                        String?
+  job_title                                    String?
+  email                                        String?
+  status                                       EmployeeStatus                @default(PENDING)
+  joined_on                                    DateTime?                     @db.Date
+  created_at                                   DateTime                      @default(now()) @db.Timestamptz(3)
+  user_id_ref                                  users?                        @relation("employees_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref                              businesses                    @relation("employees_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  activation_tokens_employee_id_rows           activation_tokens[]           @relation("activation_tokens_employee_id")
+  employee_branch_assignments_employee_id_rows employee_branch_assignments[] @relation("employee_branch_assignments_employee_id")
+  shift_assignments_employee_id_rows           shift_assignments[]           @relation("shift_assignments_employee_id")
+  face_enrollments_employee_id_rows            face_enrollments[]            @relation("face_enrollments_employee_id")
+  attendance_attempts_employee_id_rows         attendance_attempts[]         @relation("attendance_attempts_employee_id")
+  attendance_sessions_employee_id_rows         attendance_sessions[]         @relation("attendance_sessions_employee_id")
+  attendance_events_employee_id_rows           attendance_events[]           @relation("attendance_events_employee_id")
+  attendance_corrections_employee_id_rows      attendance_corrections[]      @relation("attendance_corrections_employee_id")
+  privacy_acknowledgements_employee_id_rows    privacy_acknowledgements[]    @relation("privacy_acknowledgements_employee_id")
+
+  attendance_photos_rows attendance_photos[] @relation("attendance_photos_employee")
+  leave_days_rows        leave_days[]        @relation("leave_days_employee")
+
+  @@unique([business_id, employee_code])
+  @@unique([business_id, user_id])
+  @@unique([business_id, id])
+  @@index([business_id, status])
+}
+
+model credentials {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String    @unique @db.Uuid
+  /// Admin login (argon2id). At least one of password_hash / pin_hash is set.
+  password_hash   String?
+  /// Employee mobile login.
+  pin_hash        String?
+  changed_at      DateTime  @default(now()) @db.Timestamptz(3)
+  failed_attempts Int       @default(0)
+  locked_until    DateTime? @db.Timestamptz(3)
+  user_id_ref     users     @relation("credentials_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model activation_tokens {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  employee_id     String     @db.Uuid
+  token_hash      String     @unique
+  expires_at      DateTime   @db.Timestamptz(3)
+  consumed_at     DateTime?  @db.Timestamptz(3)
+  issued_by       String     @db.Uuid
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  employee_id_ref employees  @relation("activation_tokens_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  issued_by_ref   users      @relation("activation_tokens_issued_by", fields: [issued_by], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses @relation("activation_tokens_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+}
+
+model sessions {
+  id                          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                     String      @db.Uuid
+  kind                        SessionKind @default(ADMIN)
+  refresh_token_hash          String      @unique
+  /// Previous token, still accepted for a short grace period after rotation.
+  previous_refresh_token_hash String?     @unique
+  rotated_at                  DateTime?   @db.Timestamptz(3)
+  expires_at                  DateTime    @db.Timestamptz(3)
+  revoked_at                  DateTime?   @db.Timestamptz(3)
+  last_used_at                DateTime?   @db.Timestamptz(3)
+  ip                          String?
+  user_agent                  String?
+  device_metadata             Json        @default("{}")
+  created_at                  DateTime    @default(now()) @db.Timestamptz(3)
+  user_id_ref                 users       @relation("sessions_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([user_id, expires_at])
+}
+
+model branches {
+  id                                         String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                                String                         @db.Uuid
+  code                                       String
+  name                                       String
+  address                                    String?
+  status                                     EntityStatus                   @default(ACTIVE)
+  timezone                                   String                         @default("Asia/Kolkata")
+  business_id_ref                            businesses                     @relation("branches_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_membership_branches_branch_rows   business_membership_branches[] @relation("business_membership_branches_branch")
+  geofences_branch_id_rows                   geofences[]                    @relation("geofences_branch_id")
+  employee_branch_assignments_branch_id_rows employee_branch_assignments[]  @relation("employee_branch_assignments_branch_id")
+  attendance_attempts_branch_id_rows         attendance_attempts[]          @relation("attendance_attempts_branch_id")
+  attendance_sessions_branch_id_rows         attendance_sessions[]          @relation("attendance_sessions_branch_id")
+  attendance_events_branch_id_rows           attendance_events[]            @relation("attendance_events_branch_id")
+
+  @@unique([business_id, code])
+  @@unique([business_id, id])
+}
+
+model geofences {
+  id                               String                               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                      String                               @db.Uuid
+  branch_id                        String                               @db.Uuid
+  center                           Unsupported("geography(Point,4326)")
+  radius_m                         Float                                @default(100)
+  max_accuracy_m                   Float                                @default(50)
+  active_from                      DateTime                             @default(now()) @db.Timestamptz(3)
+  active_to                        DateTime?                            @db.Timestamptz(3)
+  branch_id_ref                    branches                             @relation("geofences_branch_id", fields: [business_id, branch_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref                  businesses                           @relation("geofences_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  location_checks_geofence_id_rows location_checks[]                    @relation("location_checks_geofence_id")
+
+  @@unique([business_id, id])
+}
+
+model employee_branch_assignments {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  employee_id     String     @db.Uuid
+  branch_id       String     @db.Uuid
+  effective_from  DateTime   @default(now()) @db.Timestamptz(3)
+  effective_to    DateTime?  @db.Timestamptz(3)
+  employee_id_ref employees  @relation("employee_branch_assignments_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  branch_id_ref   branches   @relation("employee_branch_assignments_branch_id", fields: [business_id, branch_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses @relation("employee_branch_assignments_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+  @@index([business_id, employee_id, effective_from])
+}
+
+model shifts {
+  id                              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                     String              @db.Uuid
+  name                            String
+  starts_local                    DateTime            @db.Time(0)
+  ends_local                      DateTime            @db.Time(0)
+  timezone                        String              @default("Asia/Kolkata")
+  grace_min                       Int                 @default(10)
+  break_min                       Int                 @default(0)
+  overnight                       Boolean             @default(false)
+  policy_json                     Json                @default("{}")
+  business_id_ref                 businesses          @relation("shifts_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  shift_assignments_shift_id_rows shift_assignments[] @relation("shift_assignments_shift_id")
+
+  @@unique([business_id, id])
+}
+
+model shift_assignments {
+  id                                           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                                  String                @db.Uuid
+  employee_id                                  String                @db.Uuid
+  shift_id                                     String                @db.Uuid
+  effective_from                               DateTime              @db.Date
+  effective_to                                 DateTime?             @db.Date
+  weekly_pattern                               Json                  @default("[1,2,3,4,5]")
+  employee_id_ref                              employees             @relation("shift_assignments_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  shift_id_ref                                 shifts                @relation("shift_assignments_shift_id", fields: [business_id, shift_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref                              businesses            @relation("shift_assignments_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attendance_sessions_shift_assignment_id_rows attendance_sessions[] @relation("attendance_sessions_shift_assignment_id")
+
+  @@unique([business_id, id])
+  @@index([business_id, employee_id, effective_from])
+}
+
+model calendars {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  name            String
+  calendar_date   DateTime   @db.Date
+  is_working_day  Boolean    @default(false)
+  policy_json     Json       @default("{}")
+  business_id_ref businesses @relation("calendars_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, calendar_date])
+  @@unique([business_id, id])
+}
+
+model face_enrollments {
+  id                             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                    String           @db.Uuid
+  employee_id                    String           @db.Uuid
+  image_object_key               String
+  provider_version               String
+  status                         EnrollmentStatus @default(PENDING)
+  approved_by                    String?          @db.Uuid
+  approved_at                    DateTime?        @db.Timestamptz(3)
+  created_at                     DateTime         @default(now()) @db.Timestamptz(3)
+  superseded_at                  DateTime?        @db.Timestamptz(3)
+  employee_id_ref                employees        @relation("face_enrollments_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  approved_by_ref                users?           @relation("face_enrollments_approved_by", fields: [approved_by], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref                businesses       @relation("face_enrollments_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  face_checks_enrollment_id_rows face_checks[]    @relation("face_checks_enrollment_id")
+
+  @@unique([business_id, id])
+}
+
+model attendance_attempts {
+  id                                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                       String              @db.Uuid
+  employee_id                       String              @db.Uuid
+  branch_id                         String              @db.Uuid
+  action                            AttendanceAction
+  challenge_nonce_hash              String              @unique
+  liveness_session_id               String?             @unique
+  status                            AttemptStatus       @default(INITIATED)
+  issued_at                         DateTime            @default(now()) @db.Timestamptz(3)
+  expires_at                        DateTime            @db.Timestamptz(3)
+  consumed_at                       DateTime?           @db.Timestamptz(3)
+  idempotency_key                   String
+  policy_snapshot                   Json                @default("{}")
+  employee_id_ref                   employees           @relation("attendance_attempts_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  branch_id_ref                     branches            @relation("attendance_attempts_branch_id", fields: [business_id, branch_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref                   businesses          @relation("attendance_attempts_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  face_checks_attempt_id_rows       face_checks[]       @relation("face_checks_attempt_id")
+  location_checks_attempt_id_rows   location_checks[]   @relation("location_checks_attempt_id")
+  attendance_events_attempt_id_rows attendance_events[] @relation("attendance_events_attempt_id")
+
+  attendance_photo_rows attendance_photos[] @relation("attendance_photos_attempt")
+
+  @@unique([business_id, employee_id, idempotency_key])
+  @@unique([business_id, id])
+  @@index([employee_id, issued_at(sort: Desc)])
+}
+
+model face_checks {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id       String              @db.Uuid
+  attempt_id        String              @unique @db.Uuid
+  enrollment_id     String              @db.Uuid
+  liveness_score    Float?
+  similarity_score  Float?
+  provider          String              @default("AWS_REKOGNITION")
+  result            VerificationResult
+  reason            String?
+  checked_at        DateTime            @default(now()) @db.Timestamptz(3)
+  attempt_id_ref    attendance_attempts @relation("face_checks_attempt_id", fields: [business_id, attempt_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  enrollment_id_ref face_enrollments    @relation("face_checks_enrollment_id", fields: [business_id, enrollment_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref   businesses          @relation("face_checks_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+}
+
+model location_checks {
+  id                        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id               String              @db.Uuid
+  attempt_id                String              @unique @db.Uuid
+  reported_lat              Float
+  reported_lon              Float
+  accuracy_m                Float
+  client_position_timestamp DateTime            @db.Timestamptz(3)
+  distance_m                Float?
+  geofence_id               String              @db.Uuid
+  result                    VerificationResult
+  reason                    String?
+  checked_at                DateTime            @default(now()) @db.Timestamptz(3)
+  attempt_id_ref            attendance_attempts @relation("location_checks_attempt_id", fields: [business_id, attempt_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  geofence_id_ref           geofences           @relation("location_checks_geofence_id", fields: [business_id, geofence_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref           businesses          @relation("location_checks_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+}
+
+model attendance_sessions {
+  id                                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                            String                   @db.Uuid
+  employee_id                            String                   @db.Uuid
+  branch_id                              String                   @db.Uuid
+  shift_assignment_id                    String?                  @db.Uuid
+  work_date                              DateTime                 @db.Date
+  opened_at                              DateTime                 @db.Timestamptz(3)
+  closed_at                              DateTime?                @db.Timestamptz(3)
+  status                                 AttendanceSessionStatus  @default(OPEN)
+  minutes_worked_cached                  Int?
+  shift_snapshot                         Json                     @default("{}")
+  branch_snapshot                        Json                     @default("{}")
+  employee_id_ref                        employees                @relation("attendance_sessions_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  branch_id_ref                          branches                 @relation("attendance_sessions_branch_id", fields: [business_id, branch_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  shift_assignment_id_ref                shift_assignments?       @relation("attendance_sessions_shift_assignment_id", fields: [business_id, shift_assignment_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref                        businesses               @relation("attendance_sessions_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attendance_events_session_id_rows      attendance_events[]      @relation("attendance_events_session_id")
+  attendance_corrections_session_id_rows attendance_corrections[] @relation("attendance_corrections_session_id")
+  attendance_adjustments_session_id_rows attendance_adjustments[] @relation("attendance_adjustments_session_id")
+
+  @@unique([business_id, id])
+  @@index([business_id, employee_id, work_date])
+  @@index([business_id, work_date, branch_id])
+}
+
+model attendance_events {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String              @db.Uuid
+  session_id      String              @db.Uuid
+  attempt_id      String              @unique @db.Uuid
+  employee_id     String              @db.Uuid
+  type            AttendanceAction
+  occurred_at     DateTime            @default(now()) @db.Timestamptz(3)
+  branch_id       String              @db.Uuid
+  created_at      DateTime            @default(now()) @db.Timestamptz(3)
+  session_id_ref  attendance_sessions @relation("attendance_events_session_id", fields: [business_id, session_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  attempt_id_ref  attendance_attempts @relation("attendance_events_attempt_id", fields: [business_id, attempt_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  employee_id_ref employees           @relation("attendance_events_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  branch_id_ref   branches            @relation("attendance_events_branch_id", fields: [business_id, branch_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses          @relation("attendance_events_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+  @@index([business_id, employee_id, occurred_at])
+}
+
+model attendance_corrections {
+  id                                        String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                               String                   @db.Uuid
+  session_id                                String                   @db.Uuid
+  employee_id                               String                   @db.Uuid
+  requester_id                              String                   @db.Uuid
+  requested_in                              DateTime?                @db.Timestamptz(3)
+  requested_out                             DateTime?                @db.Timestamptz(3)
+  reason                                    String
+  status                                    ReviewStatus             @default(PENDING)
+  reviewer_id                               String?                  @db.Uuid
+  reviewed_at                               DateTime?                @db.Timestamptz(3)
+  created_at                                DateTime                 @default(now()) @db.Timestamptz(3)
+  session_id_ref                            attendance_sessions      @relation("attendance_corrections_session_id", fields: [business_id, session_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  employee_id_ref                           employees                @relation("attendance_corrections_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  requester_id_ref                          users                    @relation("attendance_corrections_requester_id", fields: [requester_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reviewer_id_ref                           users?                   @relation("attendance_corrections_reviewer_id", fields: [reviewer_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref                           businesses               @relation("attendance_corrections_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  approvals_correction_id_rows              approvals[]              @relation("approvals_correction_id")
+  attendance_adjustments_correction_id_rows attendance_adjustments[] @relation("attendance_adjustments_correction_id")
+
+  @@unique([business_id, id])
+}
+
+model approvals {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id       String                 @db.Uuid
+  correction_id     String                 @db.Uuid
+  reviewer_id       String                 @db.Uuid
+  decision          ReviewStatus
+  reason            String
+  created_at        DateTime               @default(now()) @db.Timestamptz(3)
+  correction_id_ref attendance_corrections @relation("approvals_correction_id", fields: [business_id, correction_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  reviewer_id_ref   users                  @relation("approvals_reviewer_id", fields: [reviewer_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref   businesses             @relation("approvals_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, correction_id, reviewer_id])
+  @@unique([business_id, id])
+}
+
+model attendance_adjustments {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id       String                 @db.Uuid
+  correction_id     String                 @unique @db.Uuid
+  session_id        String                 @db.Uuid
+  approved_in       DateTime?              @db.Timestamptz(3)
+  approved_out      DateTime?              @db.Timestamptz(3)
+  approved_by       String                 @db.Uuid
+  created_at        DateTime               @default(now()) @db.Timestamptz(3)
+  correction_id_ref attendance_corrections @relation("attendance_adjustments_correction_id", fields: [business_id, correction_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  session_id_ref    attendance_sessions    @relation("attendance_adjustments_session_id", fields: [business_id, session_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  approved_by_ref   users                  @relation("attendance_adjustments_approved_by", fields: [approved_by], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref   businesses             @relation("attendance_adjustments_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+}
+
+model audit_logs {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String        @db.Uuid
+  business_id         String?       @db.Uuid
+  actor_id            String?       @db.Uuid
+  object_type         String
+  object_id           String
+  action              String
+  before_json         Json?
+  after_json          Json?
+  occurred_at         DateTime      @default(now()) @db.Timestamptz(3)
+  organization_id_ref organizations @relation("audit_logs_organization_id", fields: [organization_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref     businesses?   @relation("audit_logs_business_id", fields: [organization_id, business_id], references: [organization_id, id], onDelete: Restrict, onUpdate: Restrict)
+  actor_id_ref        users?        @relation("audit_logs_actor_id", fields: [actor_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([business_id, occurred_at])
+  @@index([organization_id, occurred_at])
+}
+
+model report_jobs {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id       String     @db.Uuid
+  requested_by      String     @db.Uuid
+  type              String
+  filters_json      Json       @default("{}")
+  status            JobStatus  @default(PENDING)
+  output_object_key String?
+  expires_at        DateTime?  @db.Timestamptz(3)
+  created_at        DateTime   @default(now()) @db.Timestamptz(3)
+  requested_by_ref  users      @relation("report_jobs_requested_by", fields: [requested_by], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref   businesses @relation("report_jobs_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+}
+
+model privacy_notices {
+  id                                      String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id                             String                     @db.Uuid
+  version                                 String
+  content                                 String
+  published_at                            DateTime                   @default(now()) @db.Timestamptz(3)
+  business_id_ref                         businesses                 @relation("privacy_notices_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  privacy_acknowledgements_notice_id_rows privacy_acknowledgements[] @relation("privacy_acknowledgements_notice_id")
+
+  @@unique([business_id, version])
+  @@unique([business_id, id])
+}
+
+model privacy_acknowledgements {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String          @db.Uuid
+  employee_id     String          @db.Uuid
+  notice_id       String          @db.Uuid
+  acknowledged_at DateTime        @default(now()) @db.Timestamptz(3)
+  employee_id_ref employees       @relation("privacy_acknowledgements_employee_id", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  notice_id_ref   privacy_notices @relation("privacy_acknowledgements_notice_id", fields: [business_id, notice_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses      @relation("privacy_acknowledgements_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, employee_id, notice_id])
+  @@unique([business_id, id])
+}
+
+model retention_jobs {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  kind            String
+  status          JobStatus  @default(PENDING)
+  cutoff_at       DateTime   @db.Timestamptz(3)
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  completed_at    DateTime?  @db.Timestamptz(3)
+  business_id_ref businesses @relation("retention_jobs_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+}
+
+model notification_jobs {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  user_id         String     @db.Uuid
+  kind            String
+  payload_json    Json       @default("{}")
+  status          JobStatus  @default(PENDING)
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  completed_at    DateTime?  @db.Timestamptz(3)
+  user_id_ref     users      @relation("notification_jobs_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses @relation("notification_jobs_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+}
+
+/// Live selfie captured with a check-in/out attempt. Kept in Postgres until private object storage is set up.
+model attendance_photos {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String              @db.Uuid
+  attempt_id      String              @unique @db.Uuid
+  employee_id     String              @db.Uuid
+  content_type    String
+  size_bytes      Int
+  /// Only when object storage isn't configured; otherwise the image is in B2 at storage_key.
+  data            Bytes?
+  /// Object key in the private selfie bucket, e.g. selfies/<business>/<date>/<attempt>.jpg.
+  storage_key     String?             @unique
+  created_at      DateTime            @default(now()) @db.Timestamptz(3)
+  attempt_id_ref  attendance_attempts @relation("attendance_photos_attempt", fields: [business_id, attempt_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  employee_id_ref employees           @relation("attendance_photos_employee", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses          @relation("attendance_photos_business", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+  @@index([business_id, employee_id, created_at])
+}
+
+/// A day off the employee took themselves. Kept when cancelled (cancelled_at set); at most one
+/// active leave per employee per day (partial unique index leave_days_one_active_per_day).
+model leave_days {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  employee_id     String     @db.Uuid
+  leave_date      DateTime   @db.Date
+  reason          String?
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  cancelled_at    DateTime?  @db.Timestamptz(3)
+  employee_id_ref employees  @relation("leave_days_employee", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses @relation("leave_days_business", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+  @@index([business_id, leave_date])
+  @@index([business_id, employee_id, leave_date])
+}

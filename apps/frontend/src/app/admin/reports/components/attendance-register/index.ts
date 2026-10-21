@@ -1,0 +1,1 @@
+export { AttendanceRegister } from "./AttendanceRegister";

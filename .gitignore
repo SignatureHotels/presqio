@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+coverage/
+
+# Local credentials and tool state
+.aws/
+.codex/
+.agents/
+*.pem
+*.key
+*.p12
+*.pfx
+*.tsbuildinfo

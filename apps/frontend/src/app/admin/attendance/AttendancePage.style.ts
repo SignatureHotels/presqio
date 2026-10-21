@@ -1,0 +1,43 @@
+import styled from "@emotion/styled";
+
+export const Register = styled.section({
+  padding: 20,
+  '.register-controls': { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 16 },
+  '.register-note': { color: 'var(--muted, #667085)', fontSize: 13, lineHeight: 1.6, margin: '10px 0' },
+  '.register-scroll': { overflow: 'auto', maxHeight: '70vh', border: '1px solid #e4e7ec', borderRadius: 12 },
+  table: { borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: 13 },
+  'th, td': { borderRight: '1px solid #e4e7ec', borderBottom: '1px solid #e4e7ec', padding: 10, verticalAlign: 'top', minWidth: 228 },
+  'thead th': { position: 'sticky', top: 0, zIndex: 2, background: '#f8fafc', textAlign: 'left' },
+  'tbody th': { position: 'sticky', left: 0, zIndex: 1, background: '#fff', minWidth: 200 },
+  'thead th:first-child': { left: 0, zIndex: 3, minWidth: 200, background: '#f8fafc' },
+  '.employee-name': { border: 0, background: 'none', color: 'inherit', font: 'inherit', fontWeight: 600, textAlign: 'left', cursor: 'pointer', padding: 0 },
+  small: { display: 'block', color: '#667085', marginTop: 5, fontWeight: 400 },
+  '.day-button': { display: 'grid', gap: 6, width: '100%', textAlign: 'left', background: 'transparent', border: 0, borderRadius: 6, padding: 4, cursor: 'pointer', color: '#344054', font: 'inherit', '&:hover': { background: '#f0f5ff' }, '&:focus-visible': { outline: '2px solid #4263eb', outlineOffset: 2 } },
+  '.register-day': { display: 'grid', gap: 10 },
+  '.date-punch-headings, .grid-punch-pair': { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 },
+  '.date-punch-headings': { marginTop: 10, fontSize: 11, color: '#667085', fontWeight: 500 },
+  '.grid-session': { paddingBottom: 10, borderBottom: '1px solid #eaecf0' },
+  '.grid-session-label': { display: 'block', color: '#667085', fontSize: 11, marginBottom: 8 },
+  '.grid-punch': { display: 'grid', gap: 8, alignContent: 'start', justifyItems: 'start' },
+  '.grid-punch time': { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
+  '.day-offset': { fontSize: 10, color: '#667085', fontWeight: 500 },
+  '.selfie-placeholder': { width: 56, height: 56, borderRadius: 12, background: '#f8fafc', border: '1px dashed #d0d5dd', display: 'grid', placeItems: 'center', textAlign: 'center', padding: 4, fontSize: 10, color: '#667085' },
+  '.pending-punch, .empty-punches': { color: '#667085', fontSize: 12 },
+  '.empty-punches': { padding: '6px 0' },
+  '.register-status': { fontSize: 11, fontWeight: 600, color: '#475467', background: '#f2f4f7', borderRadius: 5, padding: '3px 6px', width: 'fit-content' },
+  '[data-status="Present"]': { color: '#067647', background: '#ecfdf3' },
+  '[data-status="Late"]': { color: '#b54708', background: '#fffaeb' },
+  '[data-status="On leave"]': { color: '#6941c6', background: '#f4f3ff' },
+  '.register-footer': { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 16 },
+  '.register-pager': { display: 'flex', alignItems: 'center', gap: 12 },
+});
+
+export const SessionCard = styled.article({
+  border: '1px solid #e4e7ec', borderRadius: 12, padding: 16, margin: '12px 0',
+  h3: { margin: '0 0 6px', fontSize: 15 },
+  p: { margin: '8px 0', color: '#475467', fontSize: 13 },
+  '.punches': { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 },
+  '.punch': { display: 'grid', gap: 8, alignContent: 'start' },
+  '.punch-label': { color: '#667085', fontSize: 12 },
+  time: { fontWeight: 600, fontSize: 14 },
+});

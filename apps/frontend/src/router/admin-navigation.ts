@@ -1,0 +1,58 @@
+export const adminNavigation = [
+  {
+    path: "overview",
+    title: "Overview",
+    icon: "grid",
+    heading: "Good morning, Admin 👋",
+    description: "Here's what's happening across your branches today.",
+  },
+  {
+    path: "attendance/live",
+    title: "Attendance register",
+    icon: "clock",
+    heading: "Attendance register",
+    description: "Compare dates, check-in and check-out times, hours and employee selfies.",
+  },
+  {
+    path: "employees",
+    title: "Employees",
+    icon: "users",
+    heading: "Employees",
+    description: "Manage employee profiles, access and workplace assignments.",
+  },
+  {
+    path: "branches",
+    title: "Branches & geofences",
+    icon: "map",
+    heading: "Branches & geofences",
+    description: "Define where your team can check in and check out.",
+  },
+  {
+    path: "shifts",
+    title: "Shifts & policies",
+    icon: "calendar",
+    heading: "Shifts & policies",
+    description: "Plan working hours and clear attendance rules.",
+  },
+  {
+    path: "corrections",
+    title: "Approvals",
+    icon: "shield",
+    heading: "Pending approvals",
+    description: "Review attendance exceptions and correction requests.",
+  },
+  {
+    path: "reports",
+    title: "Reports",
+    icon: "report",
+    heading: "Reports & analytics",
+    description: "Attendance reports, dated in/out records, selfies and CSV exports.",
+  },
+  {
+    path: "settings",
+    title: "Settings",
+    icon: "settings",
+    heading: "Workspace settings",
+    description: "Manage your workspace preferences and integrations.",
+  },
+];
