@@ -14,7 +14,7 @@ import type {
 } from "@presqio/lib";
 import { parse } from "./client";
 
-const BASE = "/api/v1";
+import { API_BASE_URL as BASE } from "./config";
 
 /**
  * The employee app's own session, separate from the admin one so both can be signed in on the

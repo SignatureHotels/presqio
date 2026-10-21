@@ -21,6 +21,7 @@ Node 24 LTS (see `.nvmrc`), Yarn 1.22.22, and Docker Compose for local PostgreSQ
 ```sh
 yarn install
 cp apps/backend/.env.example apps/backend/.env
+cp apps/frontend/.env.example apps/frontend/.env
 yarn infra:up
 yarn db:deploy
 yarn db:seed
@@ -41,7 +42,7 @@ yarn backend:dev
 - Database readiness: http://localhost:8080/api/v1/health/ready
 - Swagger (development only): http://localhost:8080/api/docs
 
-The UI proxies `/api` to port 8080. No secrets or AWS credentials belong in frontend environment variables. API uses `.env` in `apps/backend`; default development configuration also allows startup without copying it. Database CLI commands require `DATABASE_URL` from that file or the environment. Installation generates Prisma Client without requiring a running database.
+The UI proxies the `VITE_API_URL` path to the frontend environment's `BACKEND_ORIGIN`. Set both in `apps/frontend/.env` (see the example). No secrets or AWS credentials belong in frontend environment variables. API uses `.env` in `apps/backend`; default development configuration also allows startup without copying it. Database CLI commands require `DATABASE_URL` from that file or the environment. Installation generates Prisma Client without requiring a running database.
 
 Optional queue observer: `yarn worker:dev`. Redis must be running. Background job consumers are not implemented yet.
 

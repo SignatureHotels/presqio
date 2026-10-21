@@ -12,11 +12,13 @@ RUN yarn install --frozen-lockfile --ignore-scripts --non-interactive
 COPY packages/config packages/config
 COPY packages/lib packages/lib
 COPY apps/frontend apps/frontend
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
 RUN yarn workspace @presqio/lib build && yarn workspace @presqio/frontend build
 RUN rm -f apps/frontend/dist/_worker.js apps/frontend/dist/_routes.json apps/frontend/dist/_headers
 
 FROM nginx:stable-alpine
-ENV BACKEND_ORIGIN=http://backend:8080
+COPY --chmod=755 apps/frontend/docker-entrypoint.d/19-check-backend-origin.sh /docker-entrypoint.d/19-check-backend-origin.sh
 COPY apps/frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/apps/frontend/dist /usr/share/nginx/html
 EXPOSE 80

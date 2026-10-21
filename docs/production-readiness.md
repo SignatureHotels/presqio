@@ -25,6 +25,9 @@ implemented and tested. UI branch filters are not authorization.
 - Replaced deprecated Node/Node10 resolution with matching `Node16` module and
   resolution settings in backend, worker and shared library. These packages
   remain CommonJS at runtime because their package manifests have no ESM type.
+- Required explicit frontend API environment settings: `VITE_API_URL=/api/v1`
+  for the browser path and `BACKEND_ORIGIN` for the proxy host; no backend address
+  is hardcoded in Vite or the frontend container.
 - Made Node ambient types explicit. Added a frontend test tsconfig, included in
   typechecking, so frontend tests are checked as well as application/Vite code.
 - Added editor settings for the installed workspace TypeScript SDK. The repository
@@ -97,7 +100,8 @@ selfie evidence do not establish that a particular person is present.
 2. **Create staging.** Separate Postgres/PostGIS database, Render backend and
    Cloudflare Pages project; separate JWT, mail and private bucket credentials.
    Follow `deployment.md` for the exact build/output/environment settings.
-3. **Verify the public path.** Configure Pages `BACKEND_ORIGIN`; Render
+3. **Verify the public path.** Configure Pages build variable `VITE_API_URL=/api/v1` and runtime
+   `BACKEND_ORIGIN`; Render
    `UI_ORIGIN`/`APP_URL` must be the exact frontend HTTPS origin. Test readiness,
    cookie restoration, authorization and selfies through the frontend host.
    A preview origin needs its own matching staging backend configuration.

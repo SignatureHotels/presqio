@@ -8,7 +8,7 @@
     "build": "yarn typecheck && vite build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json && tsc -p tsconfig.test.json",
     "preview": "vite preview --port 300 --strictPort",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "node --env-file=.env.example --import ./test/setup-env.mjs --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -55,6 +55,7 @@ Connect the repository as a Pages project with:
 | Build output directory | `apps/frontend/dist` |
 | Build environment `NODE_VERSION` | `24` |
 | Build environment `YARN_VERSION` | `1.22.22` |
+| Build environment `VITE_API_URL` | `/api/v1` |
 | Production runtime variable `BACKEND_ORIGIN` | Your Render origin, e.g. `https://presqio-backend.onrender.com` |
 
 `BACKEND_ORIGIN` must be HTTPS, with no path, credentials, or query. Do not add
@@ -64,7 +65,13 @@ served by Pages, including SPA fallback for `/admin/*` and `/employee/*`.
 The generated `dist/_worker.js` and `dist/_routes.json` must be included in the
 Pages deployment. Do not deploy `src` or the repository as the output directory.
 
-The browser calls `/api/v1` on the frontend origin. Refresh cookies consequently
+Use **both** variables. `VITE_API_URL` is the public same-origin API path compiled
+into the browser bundle. `BACKEND_ORIGIN` is the backend host read by the Pages
+Worker at runtime. Do not put the Render address into `VITE_API_URL`. Change the
+public path only when backend routes and proxy routes are updated together.
+Vite refuses to build without a valid `VITE_API_URL`; there is no URL fallback.
+
+The browser calls the configured `/api/v1` path on the frontend origin. Refresh cookies consequently
 remain first party with the existing HttpOnly, Secure and SameSite=Lax settings.
 Do not change browser API URLs to the Render address. After assigning a custom
 frontend domain, update `UI_ORIGIN` and `APP_URL` in Render. Preview deployment
@@ -77,11 +84,13 @@ From the repository root:
 
 ```sh
 docker build -f apps/backend/Dockerfile -t presqio-backend .
-docker build -f apps/frontend/Dockerfile -t presqio-frontend .
+docker build -f apps/frontend/Dockerfile --build-arg VITE_API_URL=/api/v1 -t presqio-frontend .
 docker run --rm -p 8080:8080 --env-file /path/to/production-backend.env presqio-backend
 docker run --rm -p 3000:80 -e BACKEND_ORIGIN=https://presqio-backend.onrender.com presqio-frontend
 ```
 
+The Docker build requires the `VITE_API_URL` build argument, and the frontend
+container requires `BACKEND_ORIGIN` at runtime. Neither has a default value.
 Use an origin without a trailing slash for the Nginx proxy. Serve this frontend
 behind HTTPS for camera and location permissions, and set backend `UI_ORIGIN`
 to that frontend's origin. `.dockerignore` excludes local `.env` files.
@@ -115,3 +124,24 @@ records its date/time on the server.
 Provider references: [Cloudflare Pages advanced mode](https://developers.cloudflare.com/pages/functions/advanced-mode/),
 [Function routing](https://developers.cloudflare.com/pages/functions/routing/),
 [Render Blueprint fields](https://render.com/docs/blueprint-spec).
+
+## Local frontend environment
+
+Copy `apps/frontend/.env.example` to `apps/frontend/.env` and set:
+
+```dotenv
+VITE_API_URL=/api/v1
+BACKEND_ORIGIN=http://localhost:8080
+```
+
+Replace the backend origin if your local API uses another address or port.
+Vite development and preview proxies read this value from the environment; no
+backend address is embedded in their configuration. Restart Vite after changes.
+The local `.env` remains ignored by Git and Docker. CI sets the public API path
+explicitly. Node frontend tests load the nonsecret example environment and inject
+the same build constant that Vite normally supplies.
+
+[Vite environment variables](https://vite.dev/guide/env-and-mode) are compiled at
+build time; [Cloudflare Pages bindings](https://developers.cloudflare.com/pages/functions/bindings/)
+provide the Worker runtime environment. Redeploy Pages after setting/changing
+these values. Backend secrets still belong only in Render.

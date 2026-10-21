@@ -1,6 +1,6 @@
 import type { ApiError, AuthSessionResponse } from "@presqio/lib";
 
-const BASE = "/api/v1";
+import { API_BASE_URL as BASE } from "./config";
 
 export class ApiRequestError extends Error {
   constructor(

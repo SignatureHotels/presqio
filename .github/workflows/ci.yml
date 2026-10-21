@@ -17,6 +17,7 @@ jobs:
           --health-cmd "pg_isready -U presqio -d presqio"
           --health-interval 5s --health-timeout 5s --health-retries 15
     env:
+      VITE_API_URL: /api/v1
       DATABASE_URL: postgresql://presqio:presqio_local@localhost:5432/presqio?schema=public
     steps:
       - uses: actions/checkout@v4
@@ -37,4 +38,4 @@ jobs:
       - name: Build backend Docker image
         run: docker build --file apps/backend/Dockerfile --tag presqio-backend:ci .
       - name: Build frontend Docker image
-        run: docker build --file apps/frontend/Dockerfile --tag presqio-frontend:ci .
+        run: docker build --file apps/frontend/Dockerfile --build-arg VITE_API_URL=/api/v1 --tag presqio-frontend:ci .
