@@ -25,6 +25,8 @@ const schema = z
     JWT_ACCESS_SECRET: optional(z.string().min(32)),
     ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).default(900),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(30),
+    /** HTTPS mail transport, preferred over SMTP when configured (works on Render Free). */
+    RESEND_API_KEY: optional(z.string().trim().min(1)),
     SMTP_HOST: optional(z.string()),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
     SMTP_USER: optional(z.string()),
@@ -56,7 +58,11 @@ const schema = z
     },
     { path: ["B2_KEY_ID"], message: "Set all of B2_ENDPOINT, B2_REGION, B2_BUCKET, B2_KEY_ID and B2_APPLICATION_KEY, or none" },
   )
-  .refine((env) => !env.SMTP_HOST || (env.SMTP_USER && env.SMTP_PASS), {
+  .refine((env) => !env.RESEND_API_KEY || Boolean(env.MAIL_FROM?.trim()), {
+    path: ["MAIL_FROM"],
+    message: "MAIL_FROM is required when RESEND_API_KEY is set",
+  })
+  .refine((env) => env.RESEND_API_KEY || !env.SMTP_HOST || (env.SMTP_USER && env.SMTP_PASS), {
     path: ["SMTP_USER"],
     message: "SMTP_HOST is set, so SMTP_USER and SMTP_PASS are required",
   });

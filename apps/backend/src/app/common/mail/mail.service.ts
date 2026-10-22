@@ -4,8 +4,8 @@ import { createTransport, type Transporter } from "nodemailer";
 import type { RenderedMail } from "./mail-templates";
 
 /**
- * Sends email over SMTP (SMTP_HOST/PORT/USER/PASS).
- * Without SMTP: outside production the message, including its link, is logged so flows can be
+ * Sends through the Resend HTTPS API when RESEND_API_KEY is set, otherwise SMTP.
+ * Without a transport: outside production the message, including its link, is logged so flows can be
  * tested locally; in production nothing is sent and a warning is logged.
  */
 @Injectable()
@@ -13,13 +13,15 @@ export class MailService implements OnModuleInit {
   private readonly logger = new Logger("Mail");
   private readonly transport: Transporter | null;
   private readonly from: string;
+  private readonly resendKey: string | undefined;
 
   constructor(private readonly config: ConfigService) {
+    this.resendKey = config.get<string>("RESEND_API_KEY");
     const host = config.get<string>("SMTP_HOST");
     const port = config.getOrThrow<number>("SMTP_PORT");
     const user = config.get<string>("SMTP_USER");
     this.from = config.get<string>("MAIL_FROM") ?? (user ? `Presqio <${user}>` : "Presqio");
-    this.transport = host
+    this.transport = !this.resendKey && host
       ? createTransport({
           host,
           port,
@@ -34,10 +36,14 @@ export class MailService implements OnModuleInit {
       : null;
   }
 
-  /** Checks the SMTP login at startup without sending anything. */
+  /** SMTP can verify its login; Resend credentials are checked when a message is sent. */
   async onModuleInit() {
+    if (this.resendKey) {
+      this.logger.log("Resend HTTPS email transport configured.");
+      return;
+    }
     if (!this.transport) {
-      this.logger.warn("SMTP is not configured; emails will not be delivered.");
+      this.logger.warn("No email transport configured; emails will not be delivered.");
       return;
     }
     try {
@@ -49,9 +55,25 @@ export class MailService implements OnModuleInit {
   }
 
   async send(to: string, mail: RenderedMail) {
+    if (this.resendKey) {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.resendKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ from: this.from, to: [to], subject: mail.subject, html: mail.html, text: mail.text }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const result = await response.json().catch(() => null) as { id?: unknown; message?: string } | null;
+      if (!response.ok)
+        throw new Error(`Resend rejected email (HTTP ${response.status}): ${result?.message ?? "Request failed"}`);
+      if (typeof result?.id !== "string") throw new Error("Resend returned no email ID");
+      return result.id;
+    }
     if (!this.transport) {
       if (this.config.get("NODE_ENV") === "production")
-        this.logger.warn(`No SMTP configured; "${mail.subject}" not sent`);
+        this.logger.warn(`No email transport configured; "${mail.subject}" not sent`);
       else this.logger.log(`To: ${to}\nSubject: ${mail.subject}\n${mail.text}`);
       return;
     }
@@ -59,7 +81,7 @@ export class MailService implements OnModuleInit {
   }
 
   /**
-   * Sends in the background. Callers never wait on SMTP, so slow delivery cannot delay a
+   * Sends in the background. Callers never wait on the mail provider, so slow delivery cannot delay a
    * response or reveal (through timing) whether an account exists.
    */
   queue(to: string, mail: RenderedMail) {
