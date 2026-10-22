@@ -1,0 +1,25 @@
+import { styled } from "@mui/material/styles";
+
+export const AttendanceSheet = styled("div")({
+  display: "grid",
+  gap: 16,
+  ".attendance-counts": { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 12 },
+  ".attendance-counts > div": { display: "flex", flexDirection: "column", gap: 4, padding: "12px 14px", border: "1px solid var(--line-soft)", borderRadius: 10 },
+  ".attendance-counts strong": { fontSize: 22, lineHeight: 1.2 },
+  ".attendance-counts span": { fontWeight: 600, fontSize: 14 },
+  ".attendance-counts small": { color: "var(--muted)", fontSize: 12, lineHeight: 1.4 },
+  table: { borderCollapse: "collapse", width: "100%", fontSize: 13 },
+  "th, td": { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", textAlign: "left", verticalAlign: "middle" },
+  th: { background: "var(--neutral-soft)", whiteSpace: "nowrap", fontSize: 12 },
+  ".register-status": { fontSize: 11, fontWeight: 600, color: "#475467", background: "#f2f4f7", borderRadius: 5, padding: "3px 6px", whiteSpace: "nowrap" },
+  '[data-status="Present"]': { color: "#067647", background: "#ecfdf3" },
+  '[data-status="Late"]': { color: "#b54708", background: "#fffaeb" },
+  '[data-status="On leave"]': { color: "#6941c6", background: "#f4f3ff" },
+  '[data-status="No record"], [data-status="Not checked in"]': { color: "#b42318", background: "#fef3f2" },
+  ".grid-punch": { display: "flex", alignItems: "center", gap: 6 },
+  ".grid-punch time, .pending-punch": { fontVariantNumeric: "tabular-nums" },
+  ".day-offset": { fontSize: 10, marginLeft: 2, color: "var(--muted)" },
+  ".selfie-placeholder, .pending-punch": { color: "#667085", fontSize: 11 },
+  ".scroll": { overflowX: "auto" },
+  "@media (max-width:700px)": { ".attendance-counts": { gridTemplateColumns: "repeat(2,minmax(0,1fr))" } },
+});

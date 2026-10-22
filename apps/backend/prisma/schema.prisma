@@ -170,8 +170,14 @@ model businesses {
   retention_jobs_business_id_rows               retention_jobs[]               @relation("retention_jobs_business_id")
   notification_jobs_business_id_rows            notification_jobs[]            @relation("notification_jobs_business_id")
 
-  attendance_photos_business_rows attendance_photos[] @relation("attendance_photos_business")
-  leave_days_business_rows        leave_days[]        @relation("leave_days_business")
+  attendance_photos_business_rows attendance_photos[]         @relation("attendance_photos_business")
+  leave_days_business_rows        leave_days[]                @relation("leave_days_business")
+  payroll_settings_row            payroll_settings?
+  employee_payroll_profiles_rows  employee_payroll_profiles[]
+  payroll_compensations_rows      payroll_compensations[]
+  payroll_runs_rows               payroll_runs[]
+  payroll_items_rows              payroll_items[]
+  payroll_payments_rows           payroll_payments[]
 
   @@unique([organization_id, id])
   @@unique([organization_id, slug])
@@ -337,8 +343,11 @@ model employees {
   attendance_corrections_employee_id_rows      attendance_corrections[]      @relation("attendance_corrections_employee_id")
   privacy_acknowledgements_employee_id_rows    privacy_acknowledgements[]    @relation("privacy_acknowledgements_employee_id")
 
-  attendance_photos_rows attendance_photos[] @relation("attendance_photos_employee")
-  leave_days_rows        leave_days[]        @relation("leave_days_employee")
+  attendance_photos_rows     attendance_photos[]        @relation("attendance_photos_employee")
+  leave_days_rows            leave_days[]               @relation("leave_days_employee")
+  payroll_compensations_rows payroll_compensations[]
+  payroll_items_rows         payroll_items[]
+  payroll_profile_row        employee_payroll_profiles?
 
   @@unique([business_id, employee_code])
   @@unique([business_id, user_id])
@@ -808,4 +817,94 @@ model leave_days {
   @@unique([business_id, id])
   @@index([business_id, leave_date])
   @@index([business_id, employee_id, leave_date])
+}
+
+/// Payslip identity and statutory details; visible to organization owners/admins only.
+model employee_payroll_profiles {
+  employee_id       String     @id @db.Uuid
+  business_id       String     @db.Uuid
+  department        String     @default("")
+  date_of_birth     DateTime?  @db.Date
+  pan               String     @default("")
+  uan               String     @default("")
+  esi               String     @default("")
+  bank_name         String     @default("")
+  bank_account      String     @default("")
+  bank_ifsc         String     @default("")
+  bank_branch       String     @default("")
+  last_working_date DateTime?  @db.Date
+  updated_at        DateTime   @default(now()) @updatedAt @db.Timestamptz(3)
+  business_ref      businesses @relation(fields: [business_id], references: [id], onDelete: Restrict)
+  employee_ref      employees  @relation(fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict)
+
+  @@unique([business_id, employee_id])
+}
+
+model payroll_settings {
+  business_id   String     @id @db.Uuid
+  settings_json Json
+  business_ref  businesses @relation(fields: [business_id], references: [id], onDelete: Restrict)
+}
+
+model payroll_compensations {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  employee_id     String     @db.Uuid
+  effective_month DateTime   @db.Date
+  earnings_json   Json
+  deductions_json Json
+  created_by      String     @db.Uuid
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  business_ref    businesses @relation(fields: [business_id], references: [id], onDelete: Restrict)
+  employee_ref    employees  @relation(fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict)
+
+  @@unique([business_id, employee_id, effective_month])
+}
+
+model payroll_runs {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id  String          @db.Uuid
+  month        DateTime        @db.Date
+  status       String          @default("DRAFT")
+  created_by   String          @db.Uuid
+  created_at   DateTime        @default(now()) @db.Timestamptz(3)
+  finalized_by String?         @db.Uuid
+  finalized_at DateTime?       @db.Timestamptz(3)
+  business_ref businesses      @relation(fields: [business_id], references: [id], onDelete: Restrict)
+  items        payroll_items[]
+
+  @@unique([business_id, month])
+  @@unique([business_id, id])
+}
+
+model payroll_items {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id   String             @db.Uuid
+  run_id        String             @db.Uuid
+  employee_id   String             @db.Uuid
+  snapshot_json Json
+  review_json   Json
+  reviewed_by   String?            @db.Uuid
+  business_ref  businesses         @relation(fields: [business_id], references: [id], onDelete: Restrict)
+  run_ref       payroll_runs       @relation(fields: [business_id, run_id], references: [business_id, id], onDelete: Restrict)
+  employee_ref  employees          @relation(fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict)
+  payments      payroll_payments[]
+
+  @@unique([business_id, run_id, employee_id])
+  @@unique([business_id, id])
+}
+
+model payroll_payments {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id  String        @db.Uuid
+  item_id      String        @db.Uuid
+  amount       BigInt
+  reference    String
+  paid_on      DateTime      @db.Date
+  recorded_by  String        @db.Uuid
+  created_at   DateTime      @default(now()) @db.Timestamptz(3)
+  business_ref businesses    @relation(fields: [business_id], references: [id], onDelete: Restrict)
+  item_ref     payroll_items @relation(fields: [business_id, item_id], references: [business_id, id], onDelete: Restrict)
+
+  @@unique([business_id, item_id, reference])
 }

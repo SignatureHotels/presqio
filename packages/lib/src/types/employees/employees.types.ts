@@ -1,3 +1,4 @@
+import type { EmployeePayrollInput } from "../payroll";
 import type { AttendanceSnapshot } from "../attendance";
 export interface EmployeeSummary {
   id: string;
@@ -46,6 +47,7 @@ export interface CreateEmployeeRequest {
   shiftId?: string;
   /** YYYY-MM-DD */
   joinedOn?: string;
+  payroll?: EmployeePayrollInput;
 }
 export interface UpdateEmployeeRequest {
   fullName?: string;
@@ -57,4 +59,7 @@ export interface UpdateEmployeeRequest {
   /** null removes the shift assignment. */
   shiftId?: string | null;
   accountStatus?: Exclude<EmployeeAccountStatus, "PENDING">;
+  /** YYYY-MM-DD */
+  joinedOn?: string;
+  payroll?: EmployeePayrollInput;
 }

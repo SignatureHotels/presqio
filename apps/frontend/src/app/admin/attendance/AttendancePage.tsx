@@ -180,7 +180,7 @@ export function AttendancePage({ onView }: { onView: (employee: Employee) => voi
 }
 
 /** A recorded punch and its original photo, shown directly in the date cell. */
-function GridPunch({ instant, attemptId, date, timezone, label, pending = false }: {
+export function GridPunch({ instant, attemptId, date, timezone, label, pending = false }: {
   instant: string | null; attemptId: string | null; date: string; timezone: string; label: string; pending?: boolean;
 }) {
   const localDay = instant ? new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(instant)) : date;
@@ -194,7 +194,7 @@ function GridPunch({ instant, attemptId, date, timezone, label, pending = false 
   </div>;
 }
 
-function DayDetails({ employee, day, timezone, onClose }: { employee: RegisterEmployee; day: RegisterDay; timezone: string; onClose: () => void }) {
+export function DayDetails({ employee, day, timezone, onClose }: { employee: RegisterEmployee; day: RegisterDay; timezone: string; onClose: () => void }) {
   const format = (instant: string) => new Intl.DateTimeFormat("en-GB", { timeZone: timezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(instant));
   return <Dialog open onClose={onClose} fullWidth maxWidth="sm">
     <DialogTitle>{employee.name} · {day.date}</DialogTitle>

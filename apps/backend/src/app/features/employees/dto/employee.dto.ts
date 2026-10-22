@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import type { CreateEmployeeRequest, UpdateEmployeeRequest } from "@presqio/lib";
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
+import { EmployeePayrollDto } from "../../payroll/payroll.dto";
 import {
   IsEmail,
   IsIn,
@@ -12,6 +13,7 @@ import {
   Matches,
   MaxLength,
   ValidateIf,
+  ValidateNested,
 } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -53,6 +55,10 @@ export class CreateEmployeeDto implements CreateEmployeeRequest {
   @ApiPropertyOptional({ example: "2026-10-21" })
   @IsOptional() @IsISO8601({ strict: true }) @Matches(/^\d{4}-\d{2}-\d{2}$/)
   joinedOn?: string;
+
+  @ApiPropertyOptional({ description: "Payslip details and salary; organization owners/admins only" })
+  @IsOptional() @ValidateNested() @Type(() => EmployeePayrollDto)
+  payroll?: EmployeePayrollDto;
 }
 
 export class UpdateEmployeeDto implements UpdateEmployeeRequest {
@@ -80,4 +86,12 @@ export class UpdateEmployeeDto implements UpdateEmployeeRequest {
   @ApiPropertyOptional({ enum: ["ACTIVE", "SUSPENDED", "TERMINATED"] })
   @IsOptional() @IsIn(["ACTIVE", "SUSPENDED", "TERMINATED"])
   accountStatus?: "ACTIVE" | "SUSPENDED" | "TERMINATED";
+
+  @ApiPropertyOptional({ example: "2026-10-21" })
+  @IsOptional() @IsISO8601({ strict: true }) @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  joinedOn?: string;
+
+  @ApiPropertyOptional({ description: "Payslip details and salary; organization owners/admins only" })
+  @IsOptional() @ValidateNested() @Type(() => EmployeePayrollDto)
+  payroll?: EmployeePayrollDto;
 }

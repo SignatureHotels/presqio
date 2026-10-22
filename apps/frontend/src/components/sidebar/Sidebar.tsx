@@ -27,7 +27,7 @@ export function Sidebar({ loading = false }: { loading?: boolean }) {
     (approval) => approval.status === "Pending",
   );
   function navigation(items: typeof adminNavigation) {
-    return items.map((item) => (
+    return items.filter(item => item.path !== "payroll" || loading || auth.activeOrganization?.role === "OWNER" || auth.activeOrganization?.role === "ADMIN").map((item) => (
       <SideItem
         key={item.path}
         to={`/admin/${item.path}`}

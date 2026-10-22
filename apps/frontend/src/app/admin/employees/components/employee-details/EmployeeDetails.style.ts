@@ -1,22 +1,32 @@
 import { styled } from "@mui/material/styles";
 
-export const DetailList = styled("dl")({
-  margin: "25px 0",
-  "& > div": {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 25,
-    padding: "14px 0",
-    borderBottom: "1px solid var(--line-soft)",
-    fontSize: 13,
+/** A titled block of label/value pairs laid out as a responsive grid. */
+export const DetailSection = styled("section")({
+  marginTop: 22,
+  "& h3": {
+    margin: "0 0 10px",
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: "var(--muted)",
   },
-  "& dt": { color: "var(--muted)" },
-  "& dd": {
+  "& dl": {
     margin: 0,
-    textAlign: "right",
-    overflowWrap: "anywhere",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+    gap: 10,
   },
+  "& dl > div": {
+    padding: "10px 12px",
+    border: "1px solid var(--line-soft)",
+    borderRadius: 10,
+    minWidth: 0,
+  },
+  "& dt": { color: "var(--muted)", fontSize: 12, marginBottom: 4 },
+  "& dd": { margin: 0, fontSize: 14, fontWeight: 600, overflowWrap: "anywhere" },
+  "& .salary-lines": { display: "grid", gap: 2, fontWeight: 400, fontSize: 13 },
+  "& .salary-lines span": { display: "flex", justifyContent: "space-between", gap: 8 },
 });
 
 /** Sign-in details to hand to the employee. */

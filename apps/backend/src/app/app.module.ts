@@ -1,3 +1,4 @@
+import { PayrollModule } from "./features/payroll/payroll.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
@@ -44,6 +45,7 @@ import { EmployeePortalModule } from "./features/employee-portal/employee-portal
     AttendanceModule,
     CorrectionsModule,
     ReportsModule,
+    PayrollModule,
     NotificationsModule,
     AuditModule,
     PrivacyModule,

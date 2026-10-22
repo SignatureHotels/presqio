@@ -1,19 +1,28 @@
+import { Suspense, useEffect } from "react";
+import { Skeleton } from "@mui/material";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import type { Employee } from "@/types/admin-preview";
-import { AttendancePage } from "@/app/admin/attendance";
-import { OverviewPage } from "@/app/admin/overview";
-import { EmployeesPage } from "@/app/admin/employees";
-import { BranchesPage } from "@/app/admin/branches";
-import { ShiftsPage } from "@/app/admin/shifts";
-import { ApprovalsPage } from "@/app/admin/approvals";
-import { ReportsPage } from "@/app/admin/reports";
-import { SettingsPage } from "@/app/admin/settings";
+import { lazyPage, preloadWhenIdle } from "./lazy-page";
+
+// Each admin page is its own chunk; all are prefetched when idle so moving between pages stays instant.
+const OverviewPage = lazyPage(() => import("@/app/admin/overview"), "OverviewPage");
+const EmployeesPage = lazyPage(() => import("@/app/admin/employees"), "EmployeesPage");
+const AttendancePage = lazyPage(() => import("@/app/admin/attendance"), "AttendancePage");
+const BranchesPage = lazyPage(() => import("@/app/admin/branches"), "BranchesPage");
+const ShiftsPage = lazyPage(() => import("@/app/admin/shifts"), "ShiftsPage");
+const ApprovalsPage = lazyPage(() => import("@/app/admin/approvals"), "ApprovalsPage");
+const ReportsPage = lazyPage(() => import("@/app/admin/reports"), "ReportsPage");
+const SettingsPage = lazyPage(() => import("@/app/admin/settings"), "SettingsPage");
+const PayrollPage = lazyPage(() => import("@/app/admin/payroll/PayrollPage"), "default");
+const PAGES = [OverviewPage, EmployeesPage, AttendancePage, BranchesPage, ShiftsPage, ApprovalsPage, ReportsPage, SettingsPage, PayrollPage];
 export function AdminRoutes({
   onView,
 }: {
   onView: (employee: Employee) => void;
 }) {
+  useEffect(() => preloadWhenIdle(PAGES), []);
   return (
+    <Suspense fallback={<Skeleton variant="rounded" height={260} />}>
     <Routes>
       <Route index element={<Navigate to="overview" replace />} />
       <Route path="overview" element={<OverviewPage onView={onView} />} />
@@ -36,6 +45,7 @@ export function AdminRoutes({
         path="approvals"
         element={<Navigate to="/admin/corrections" replace />}
       />
+      <Route path="payroll" element={<PayrollPage />} />
       <Route path="reports" element={<ReportsPage />} />
       <Route path="settings" element={<SettingsPage />} />
       <Route
@@ -50,5 +60,6 @@ export function AdminRoutes({
         }
       />
     </Routes>
+    </Suspense>
   );
 }

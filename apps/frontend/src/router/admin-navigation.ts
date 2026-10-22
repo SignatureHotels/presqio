@@ -42,6 +42,13 @@ export const adminNavigation = [
     description: "Review attendance exceptions and correction requests.",
   },
   {
+    path: "payroll",
+    title: "Payroll",
+    icon: "file",
+    heading: "Payroll",
+    description: "Review attendance, prepare monthly salaries and publish employee payslips.",
+  },
+  {
     path: "reports",
     title: "Reports",
     icon: "report",

@@ -13,6 +13,7 @@ import { addDays, dateOnly, localDate } from "../../common/time/zoned";
 import { AttendanceService, type TodaySnapshot } from "../attendance/attendance.service";
 import { PhotoStorageService } from "../../common/storage/photo-storage.service";
 import { AuditService } from "../audit/audit.service";
+import { PayrollService } from "../payroll/payroll.service";
 import type { CreateEmployeeDto, UpdateEmployeeDto } from "./dto/employee.dto";
 
 const EMPLOYEE_INCLUDE = {
@@ -36,6 +37,7 @@ export class EmployeesService {
     private readonly attendance: AttendanceService,
     private readonly audit: AuditService,
     private readonly storage: PhotoStorageService,
+    private readonly payroll: PayrollService,
   ) {}
 
   async list(businessId: string): Promise<EmployeeRecord[]> {
@@ -56,6 +58,7 @@ export class EmployeesService {
     actor: RequestUser,
     dto: CreateEmployeeDto,
   ): Promise<EmployeeRecord> {
+    assertPayrollAccess(org, dto.payroll);
     let employeeId: string;
     try {
       employeeId = await this.db.$transaction(async (tx) => {
@@ -118,6 +121,9 @@ export class EmployeesService {
           },
           tx,
         );
+        if (dto.payroll)
+          await this.payroll.saveEmployeePayroll(tx, org.organizationId, businessId, actor.userId,
+            { id: employee.id, joinedOn: employee.joined_on!.toISOString().slice(0, 10) }, dto.payroll);
         return employee.id;
       });
     } catch (error) {
@@ -138,6 +144,7 @@ export class EmployeesService {
       include: EMPLOYEE_INCLUDE,
     });
     if (!before) throw new NotFoundException("Employee not found");
+    assertPayrollAccess(org, dto.payroll);
     await this.db.$transaction(async (tx) => {
       const now = new Date();
       const today = localDate(await this.timezone(tx, businessId));
@@ -149,8 +156,14 @@ export class EmployeesService {
           email: dto.email === undefined ? undefined : dto.email.toLowerCase() || null,
           job_title: dto.jobTitle === undefined ? undefined : dto.jobTitle || null,
           status: dto.accountStatus,
+          joined_on: dto.joinedOn ? dateOnly(dto.joinedOn) : undefined,
         },
       });
+      if (dto.payroll) {
+        const joinedOn = dto.joinedOn ?? (before.joined_on ?? before.created_at).toISOString().slice(0, 10);
+        await this.payroll.saveEmployeePayroll(tx, org.organizationId, businessId, actor.userId,
+          { id: employeeId, joinedOn }, dto.payroll);
+      }
       const currentBranch = before.employee_branch_assignments_employee_id_rows[0];
       if (dto.branchId && dto.branchId !== currentBranch?.branch_id) {
         await this.assertBranch(tx, businessId, dto.branchId);
@@ -205,7 +218,8 @@ export class EmployeesService {
           objectId: employeeId,
           action: "updated",
           before: { name: before.full_name, status: before.status },
-          after: { name: dto.fullName ?? before.full_name, ...dto } as Prisma.InputJsonValue,
+          // Payroll details are audited separately and must not be copied into this log.
+          after: { name: dto.fullName ?? before.full_name, ...dto, payroll: undefined } as Prisma.InputJsonValue,
         },
         tx,
       );
@@ -278,6 +292,12 @@ export class EmployeesService {
   }
 }
 
+
+/** Salary and statutory details are restricted to organization owners/admins. */
+function assertPayrollAccess(org: OrganizationContext, payroll: unknown) {
+  if (payroll && org.role !== "OWNER" && org.role !== "ADMIN")
+    throw new ForbiddenException("Only organization owners and admins can set payroll details");
+}
 
 const workingDaysOf = (policy: Prisma.JsonValue): Weekday[] =>
   ((policy ?? {}) as { workingDays?: Weekday[] }).workingDays ?? [1, 2, 3, 4, 5, 6];

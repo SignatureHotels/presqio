@@ -1,25 +1,26 @@
 import { AdminLoadingShell } from "@/layouts/admin-layout/AdminLoadingShell";
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { EmployeePage } from "@/app/employee";
-import { OwnerPage } from "@/app/owner";
-import { NotFoundPage } from "@/app/not-found";
-import { HomePage } from "@/app/public/home";
-import {
-  ForgotPasswordPage,
-  LoginPage,
-  RegisterPage,
-  ResetPasswordPage,
-  VerifyEmailPage,
-} from "@/app/auth";
-import { SelectOrganizationPage } from "@/app/select-organization";
 import { FullPageStatus, GuestOnly, RequireAuth, RequireWorkspace } from "./route-guards";
-const AdminWorkspace = lazy(() => import("@/app/admin/AdminWorkspace"));
-const OnboardingPage = lazy(() =>
-  import("@/app/onboarding").then((module) => ({ default: module.OnboardingPage })),
-);
+import { lazyPage } from "./lazy-page";
+
+// Every area loads on demand, so visitors download only the part of the app they use.
+const HomePage = lazyPage(() => import("@/app/public/home"), "HomePage");
+const LoginPage = lazyPage(() => import("@/app/auth/login/LoginPage"), "LoginPage");
+const RegisterPage = lazyPage(() => import("@/app/auth/register/RegisterPage"), "RegisterPage");
+const ForgotPasswordPage = lazyPage(() => import("@/app/auth/forgot-password/ForgotPasswordPage"), "ForgotPasswordPage");
+const ResetPasswordPage = lazyPage(() => import("@/app/auth/reset-password/ResetPasswordPage"), "ResetPasswordPage");
+const VerifyEmailPage = lazyPage(() => import("@/app/auth/verify-email/VerifyEmailPage"), "VerifyEmailPage");
+const SelectOrganizationPage = lazyPage(() => import("@/app/select-organization"), "SelectOrganizationPage");
+const OnboardingPage = lazyPage(() => import("@/app/onboarding"), "OnboardingPage");
+const AdminWorkspace = lazyPage(() => import("@/app/admin/AdminWorkspace"), "default");
+const EmployeePage = lazyPage(() => import("@/app/employee"), "EmployeePage");
+const OwnerPage = lazyPage(() => import("@/app/owner"), "OwnerPage");
+const NotFoundPage = lazyPage(() => import("@/app/not-found"), "NotFoundPage");
+
 export function AppRouter() {
   return (
+    <Suspense fallback={<FullPageStatus label="Loading…" />}>
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
@@ -60,5 +61,6 @@ export function AppRouter() {
       <Route path="/owner/*" element={<OwnerPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </Suspense>
   );
 }
