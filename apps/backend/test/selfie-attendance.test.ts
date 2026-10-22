@@ -30,3 +30,37 @@ test("daily attendance exposes both in/out photo IDs and times without a face se
   assert.equal(empty.checkInPhotoAttemptId, null);
   assert.equal(empty.checkOutPhotoAttemptId, null);
 });
+
+test("simultaneous attendance reads share queries, then fetch fresh data", async () => {
+  let reads = 0;
+  const db = {
+    businesses: { async findUniqueOrThrow() { reads++; return { timezone: "UTC" }; } },
+    attendance_sessions: { async findMany() { return []; } },
+    shift_assignments: { async findMany() { return []; } },
+    leave_days: { async findMany() { return []; } },
+  };
+  const service = new AttendanceService(db as unknown as DatabaseService);
+  const [first, second] = await Promise.all([service.today("business"), service.today("business")]);
+  assert.equal(first, second);
+  assert.equal(reads, 1);
+  await service.today("business");
+  assert.equal(reads, 2);
+  await service.today("other-business");
+  assert.equal(reads, 3);
+});
+
+test("failed attendance queries can be retried", async () => {
+  let reads = 0;
+  const db = {
+    businesses: { async findUniqueOrThrow() {
+      if (++reads === 1) throw new Error("Database unavailable");
+      return { timezone: "UTC" };
+    } },
+    attendance_sessions: { async findMany() { return []; } },
+    shift_assignments: { async findMany() { return []; } },
+    leave_days: { async findMany() { return []; } },
+  };
+  const service = new AttendanceService(db as unknown as DatabaseService);
+  await assert.rejects(service.today("business"), /Database unavailable/);
+  assert.equal((await service.today("business")).timezone, "UTC");
+});

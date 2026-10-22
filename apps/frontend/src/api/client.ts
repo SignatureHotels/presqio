@@ -1,6 +1,7 @@
 import type { ApiError, AuthSessionResponse } from "@presqio/lib";
 
 import { API_BASE_URL as BASE } from "./config";
+import { request } from "./request";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -24,6 +25,7 @@ export const setAccessToken = (token: string | null) => {
 };
 export const subscribeToSession = (listener: typeof onSessionChange) => {
   onSessionChange = listener;
+  return () => { if (onSessionChange === listener) onSessionChange = () => {}; };
 };
 
 /** Turns a fetch response into data, or an ApiRequestError with the server's message. */
@@ -39,16 +41,17 @@ export async function parse<T>(response: Response): Promise<T> {
         : (message ?? "Something went wrong. Please try again."),
     );
   }
+  if (body === null)
+    throw new ApiRequestError(response.status, "The server returned an invalid response. Please try again.");
   return body as T;
 }
 
 /** Uses the refresh cookie to get a new access token. Concurrent callers share one request. */
 export function refreshSession(): Promise<AuthSessionResponse | null> {
-  refreshing ??= fetch(`${BASE}/auth/refresh`, {
+  refreshing ??= request(`${BASE}/auth/refresh`, {
     method: "POST",
     credentials: "include",
-  })
-    .then(async (response) => {
+  }, async (response) => {
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           setAccessToken(null);
@@ -72,8 +75,8 @@ export async function api<T>(
   path: string,
   init: { method?: string; body?: unknown } = {},
 ): Promise<T> {
-  const send = () =>
-    fetch(`${BASE}${path}`, {
+  const send = (retry: boolean): Promise<T> =>
+    request(`${BASE}${path}`, {
       method: init.method ?? "GET",
       credentials: "include",
       headers: {
@@ -81,12 +84,13 @@ export async function api<T>(
         ...(accessToken && { authorization: `Bearer ${accessToken}` }),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    }, async (response) => {
+      if (retry && response.status === 401 && accessToken && !NO_REFRESH.test(path)) {
+        if (await refreshSession()) return send(false);
+      }
+      return parse<T>(response);
     });
-  let response = await send();
-  if (response.status === 401 && accessToken && !NO_REFRESH.test(path)) {
-    if (await refreshSession()) response = await send();
-  }
-  return parse<T>(response);
+  return send(true);
 }
 
 export const errorMessage = (error: unknown) =>
@@ -94,13 +98,14 @@ export const errorMessage = (error: unknown) =>
 
 /** Authenticated binary download (e.g. a check-in photo) as an object URL for <img src>. */
 export async function apiObjectUrl(path: string): Promise<string> {
-  const send = () =>
-    fetch(`${BASE}${path}`, {
-      credentials: "include",
-      headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
-    });
-  let response = await send();
-  if (response.status === 401 && accessToken && (await refreshSession())) response = await send();
-  if (!response.ok) await parse(response);
-  return URL.createObjectURL(await response.blob());
+  const send = (retry: boolean): Promise<Blob> => request(`${BASE}${path}`, {
+    credentials: "include",
+    headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
+  }, async (response) => {
+    if (retry && response.status === 401 && accessToken && (await refreshSession()))
+      return send(false);
+    if (!response.ok) await parse(response);
+    return response.blob();
+  });
+  return URL.createObjectURL(await send(true));
 }

@@ -13,6 +13,7 @@ import type {
   SubmitAttemptRequest,
 } from "@presqio/lib";
 import { parse } from "./client";
+import { request } from "./request";
 
 import { API_BASE_URL as BASE } from "./config";
 
@@ -35,8 +36,7 @@ export const setEmployeeAccessToken = (token: string | null) => {
 };
 
 export function refreshEmployeeSession(): Promise<EmployeeSessionResponse | null> {
-  refreshing ??= fetch(`${BASE}/employee-auth/refresh`, { method: "POST", credentials: "include" })
-    .then(async (response) => {
+  refreshing ??= request(`${BASE}/employee-auth/refresh`, { method: "POST", credentials: "include" }, async (response) => {
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           accessToken = null;
@@ -57,8 +57,8 @@ export function refreshEmployeeSession(): Promise<EmployeeSessionResponse | null
 }
 
 async function call<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const send = () =>
-    fetch(`${BASE}${path}`, {
+  const send = (retry: boolean): Promise<T> =>
+    request(`${BASE}${path}`, {
       method: init.method ?? "GET",
       credentials: "include",
       headers: {
@@ -66,12 +66,13 @@ async function call<T>(path: string, init: { method?: string; body?: unknown } =
         ...(accessToken && { authorization: `Bearer ${accessToken}` }),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    }, async (response) => {
+      if (retry && response.status === 401 && accessToken && !path.startsWith("/employee-auth/")) {
+        if (await refreshEmployeeSession()) return send(false);
+      }
+      return parse<T>(response);
     });
-  let response = await send();
-  if (response.status === 401 && accessToken && !path.startsWith("/employee-auth/")) {
-    if (await refreshEmployeeSession()) response = await send();
-  }
-  return parse<T>(response);
+  return send(true);
 }
 
 export const employeeApi = {

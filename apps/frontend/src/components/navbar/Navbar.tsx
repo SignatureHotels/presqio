@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Divider, ListItemText, Menu, MenuItem } from "@mui/material";
+import { Divider, ListItemText, Menu, MenuItem, Skeleton } from "@mui/material";
 import { useAuth } from "@/hooks/use-auth";
 import { initials } from "@/utils/format";
 import { AvatarButton, Bar, BrandSub, HeaderRight, OrgDot, OrgLabel } from "./Navbar.style";
 
-export function Navbar() {
+export function Navbar({ loading = false }: { loading?: boolean }) {
   const auth = useAuth();
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -25,6 +25,7 @@ export function Navbar() {
         </div>
       </Link>
       <HeaderRight>
+        {loading ? <Skeleton variant="rounded" width={150} height={32} /> : <>
         {organization && (
           <OrgLabel>
             <OrgDot />
@@ -77,6 +78,7 @@ export function Navbar() {
             Sign out
           </MenuItem>
         </Menu>
+        </>}
       </HeaderRight>
     </Bar>
   );

@@ -27,9 +27,10 @@ export function EmployeeSessionProvider({ children }: { children: ReactNode }) {
 
   // Restore the session from the refresh cookie when the app opens.
   useEffect(() => {
+    let active = true;
     const unsubscribe = subscribeToEmployeeSession(apply);
-    void refreshEmployeeSession().then(apply);
-    return unsubscribe;
+    void refreshEmployeeSession().then((session) => { if (active) apply(session); });
+    return () => { active = false; unsubscribe(); };
   }, [apply]);
 
   // Keep the 15-minute access token fresh while the app is open.

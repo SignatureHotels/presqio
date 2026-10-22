@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Alert, Button } from "@mui/material";
+import { useAdmin } from "@/hooks/use-admin";
 import { useLocation } from "react-router-dom";
 import { Navbar } from "@/components/navbar";
 import { Sidebar } from "@/components/sidebar";
@@ -11,9 +13,11 @@ import { EmployeeDetails } from "@/app/admin/employees/components/employee-detai
 import type { Employee } from "@/types/admin-preview";
 import { AdminToolbar } from "./components/admin-toolbar";
 import { WorkspaceNotifications } from "./components/workspace-notifications";
+import { WorkspaceDataSkeleton } from "./AdminLoadingShell";
 import { AdminMain, AdminView, SkipLink } from "./AdminLayout.style";
 export function AdminLayout() {
   const location = useLocation();
+  const admin = useAdmin();
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<Employee | null>(null);
   const [editing, setEditing] = useState<Employee | null>(null);
@@ -39,7 +43,14 @@ export function AdminLayout() {
             onNotifications={() => setNotifications(true)}
           />
           <EmailVerificationNotice />
-          <AdminRoutes onView={setSelected} />
+          {admin.status === "error" && (
+            <Alert severity={admin.organization ? "warning" : "error"} action={<Button color="inherit" onClick={() => void admin.reload()}>Retry</Button>}>
+              {admin.organization ? "Could not refresh your workspace. Showing the last loaded data. " : "Could not load your workspace. "}{admin.loadError}
+            </Alert>
+          )}
+          {!admin.organization && admin.status === "loading" ? (
+            <WorkspaceDataSkeleton />
+          ) : admin.organization ? <AdminRoutes onView={setSelected} /> : null}
           <Footer />
         </AdminMain>
       </AdminView>

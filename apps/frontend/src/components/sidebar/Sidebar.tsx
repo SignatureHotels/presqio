@@ -1,4 +1,6 @@
-import { useAdmin } from "@/hooks/use-admin";
+import { useContext } from "react";
+import { Skeleton } from "@mui/material";
+import { AdminContext } from "@/context/admin-context";
 import { useAuth } from "@/hooks/use-auth";
 import { initials } from "@/utils/format";
 import { Icon } from "@/components";
@@ -17,10 +19,11 @@ import {
   UserCopy,
   UserRow,
 } from "./Sidebar.style";
-export function Sidebar() {
-  const admin = useAdmin();
+export function Sidebar({ loading = false }: { loading?: boolean }) {
+  const admin = useContext(AdminContext);
+  if (!loading && !admin) throw new Error("Sidebar must be used inside AdminProvider");
   const auth = useAuth();
-  const pending = admin.scopedApprovals.filter(
+  const pending = (admin?.scopedApprovals ?? []).filter(
     (approval) => approval.status === "Pending",
   );
   function navigation(items: typeof adminNavigation) {
@@ -33,7 +36,7 @@ export function Sidebar() {
       >
         <Icon name={item.icon} />
         <ItemLabel>{item.title}</ItemLabel>
-        {item.path === "corrections" && pending.length > 0 && (
+        {!loading && item.path === "corrections" && pending.length > 0 && (
           <Badge>{pending.length}</Badge>
         )}
       </SideItem>
@@ -55,11 +58,13 @@ export function Sidebar() {
         <HelpLink to="/admin/settings">View workspace settings →</HelpLink>
       </HelpCard>
       <UserRow>
+        {loading ? <Skeleton variant="rounded" width="100%" height={34} /> : <>
         <UserAvatar>{initials(auth.me?.user.displayName ?? "")}</UserAvatar>
         <UserCopy>
           <strong>{auth.me?.user.displayName ?? "Workspace admin"}</strong>
-          <span>{admin.organization?.name ?? auth.activeOrganization?.name}</span>
+          <span>{admin?.organization?.name ?? auth.activeOrganization?.name}</span>
         </UserCopy>
+        </>}
       </UserRow>
     </Aside>
   );

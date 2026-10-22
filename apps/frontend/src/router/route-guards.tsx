@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
+import { AdminLoadingShell } from "@/layouts/admin-layout/AdminLoadingShell";
 import { landingPath } from "@/utils/auth-routing";
 
 export function FullPageStatus({ label }: { label: string }) {
@@ -15,7 +16,10 @@ export function FullPageStatus({ label }: { label: string }) {
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const location = useLocation();
-  if (status === "loading") return <FullPageStatus label="Checking your session…" />;
+  if (status === "loading")
+    return location.pathname === "/admin" || location.pathname.startsWith("/admin/")
+      ? <AdminLoadingShell />
+      : <FullPageStatus label="Checking your session…" />;
   if (status === "anonymous")
     return (
       <Navigate

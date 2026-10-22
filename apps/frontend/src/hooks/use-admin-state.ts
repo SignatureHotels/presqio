@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Approval,
   BranchRecord,
@@ -16,6 +16,7 @@ import type {
   UpdateShiftRequest,
 } from "@presqio/lib";
 import { errorMessage } from "@/api/client";
+import { fetchWorkspace } from "@/api/workspace";
 import { businessApi, organizationsApi } from "@/api/endpoints";
 import { useAuth } from "@/hooks/use-auth";
 import type { Employee } from "@/types/admin-preview";
@@ -36,6 +37,7 @@ const withTone = (record: EmployeeRecord): Employee => ({
 export function useAdminState() {
   const auth = useAuth();
   const organizationId = auth.activeOrganization?.id ?? "";
+  const knownBusinessId = auth.activeOrganization?.businesses[0]?.id;
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [loadError, setLoadError] = useState("");
   const [organization, setOrganization] = useState<OrganizationDetail | null>(null);
@@ -49,47 +51,47 @@ export function useAdminState() {
   const [search, setSearch] = useState("");
   const [notice, notify] = useState("");
 
-  const businessId = organization?.defaultBusiness?.id ?? "";
+  const loadGeneration = useRef(0);
+  const ownsData = organization?.id === organizationId;
+  const businessId = ownsData ? organization.defaultBusiness?.id ?? "" : "";
 
   const load = useCallback(async () => {
     if (!organizationId) return;
+    const generation = ++loadGeneration.current;
     setStatus("loading");
     setLoadError("");
     try {
-      const detail = await organizationsApi.get(organizationId);
-      const business = detail.defaultBusiness;
-      if (!business) throw new Error("This organization has no branch records yet.");
-      const [branchRows, shiftRows, employeeRows, overviewData, correctionRows] =
-        await Promise.all([
-          businessApi.branches(organizationId, business.id),
-          businessApi.shifts(organizationId, business.id),
-          businessApi.employees(organizationId, business.id),
-          businessApi.overview(organizationId, business.id),
-          businessApi.corrections(organizationId, business.id),
-        ]);
-      setOrganization(detail);
-      setBranches(branchRows);
-      setShifts(shiftRows);
-      setEmployees(employeeRows.map(withTone));
-      setOverview(overviewData);
-      setApprovals(correctionRows);
+      const data = await fetchWorkspace(organizationId, knownBusinessId);
+      if (generation !== loadGeneration.current) return;
+      setOrganization(data.organization);
+      setBranches(data.branches);
+      setShifts(data.shifts);
+      setEmployees(data.employees.map(withTone));
+      setOverview(data.overview);
+      setApprovals(data.approvals);
       setStatus("ready");
     } catch (caught) {
+      if (generation !== loadGeneration.current) return;
       setLoadError(errorMessage(caught));
       setStatus("error");
     }
-  }, [organizationId]);
+  }, [organizationId, knownBusinessId]);
 
   useEffect(() => {
+    setBranchFilter("all");
+    setSearch("");
     void load();
+    return () => { ++loadGeneration.current; };
   }, [load]);
 
   // Refresh attendance and decisions from employees without interrupting an open form.
   useEffect(() => {
     if (!businessId) return;
     let cancelled = false;
+    let pending = false;
     const refresh = async () => {
-      if (document.visibilityState === "hidden") return;
+      if (pending || document.visibilityState === "hidden") return;
+      pending = true;
       try {
         const [rows, data, corrections] = await Promise.all([
           businessApi.employees(organizationId, businessId),
@@ -102,6 +104,7 @@ export function useAdminState() {
           setApprovals(corrections);
         }
       } catch { /* The next refresh can recover from a temporary network failure. */ }
+      finally { pending = false; }
     };
     const timer = window.setInterval(() => void refresh(), 30_000);
     window.addEventListener("focus", refresh);
@@ -225,26 +228,26 @@ export function useAdminState() {
   );
 
   return {
-    status,
+    status: !ownsData && status !== "error" ? "loading" as const : status,
     loadError,
     reload: load,
-    organization,
+    organization: ownsData ? organization : null,
     businessId,
-    timezone: overview?.timezone ?? organization?.defaultTimezone ?? "Asia/Kolkata",
-    today: overview?.date ?? null,
-    branches,
-    shifts,
-    employees,
-    approvals,
-    overview,
+    timezone: (ownsData ? overview?.timezone ?? organization.defaultTimezone : auth.activeOrganization?.businesses[0]?.timezone) ?? "Asia/Kolkata",
+    today: ownsData ? overview?.date ?? null : null,
+    branches: ownsData ? branches : [],
+    shifts: ownsData ? shifts : [],
+    employees: ownsData ? employees : [],
+    approvals: ownsData ? approvals : [],
+    overview: ownsData ? overview : null,
     branchFilter,
     setBranchFilter,
     search,
     setSearch,
-    scopedEmployees,
-    visibleEmployees,
-    scopedBranches,
-    scopedApprovals,
+    scopedEmployees: ownsData ? scopedEmployees : [],
+    visibleEmployees: ownsData ? visibleEmployees : [],
+    scopedBranches: ownsData ? scopedBranches : [],
+    scopedApprovals: ownsData ? scopedApprovals : [],
     notice,
     notify,
     actions,

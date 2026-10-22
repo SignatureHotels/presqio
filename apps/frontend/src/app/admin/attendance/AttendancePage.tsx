@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
 import type { AttendanceRegisterResponse, RegisterDay, RegisterEmployee } from "@presqio/lib";
 import { businessApi } from "@/api/endpoints";
@@ -31,6 +31,25 @@ export function AttendancePage({ onView }: { onView: (employee: Employee) => voi
   const [selected, setSelected] = useState<{ employee: RegisterEmployee; day: RegisterDay } | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const organizationId = organization?.id ?? "";
+  const lastQuery = useRef("");
+  const registerScroll = useRef<HTMLDivElement>(null);
+  const positionedRange = useRef<{ key: string; container: HTMLDivElement } | null>(null);
+
+  // Start at today (or the range's last date), without moving an admin browsing older days.
+  useLayoutEffect(() => {
+    const container = registerScroll.current;
+    if (!data || !container) return;
+    const key = JSON.stringify([organizationId, businessId, data.from, data.to, currentDate]);
+    if (positionedRange.current?.key === key && positionedRange.current.container === container) return;
+    const targetDate = data.dates.includes(currentDate) ? currentDate : data.to;
+    const header = container.querySelector<HTMLTableCellElement>(`thead th[data-date="${targetDate}"]`);
+    const employeeHeader = container.querySelector<HTMLTableCellElement>("thead th:first-child");
+    if (!header || !employeeHeader) return;
+    // Account for the pinned employee column; scroll only this grid, not the whole page.
+    container.scrollLeft += header.getBoundingClientRect().left
+      - container.getBoundingClientRect().left - container.clientLeft - employeeHeader.getBoundingClientRect().width;
+    positionedRange.current = { key, container };
+  }, [data, currentDate, organizationId, businessId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
@@ -42,7 +61,9 @@ export function AttendancePage({ onView }: { onView: (employee: Employee) => voi
     if (!organizationId || !businessId) return;
     let cancelled = false;
     let pending = false;
-    setData(null);
+    const queryKey = JSON.stringify([organizationId, businessId, range, page, branchFilter, debouncedSearch]);
+    if (lastQuery.current !== queryKey) setData(null);
+    lastQuery.current = queryKey;
     setBusy(true);
     setError("");
     const load = async () => {
@@ -101,13 +122,14 @@ export function AttendancePage({ onView }: { onView: (employee: Employee) => voi
         Hours include completed sessions only. Rest days follow assigned shift working days; “No record” means no recorded attendance.
         {data && ` Showing ${dateHeading(data.from)} – ${dateHeading(data.to)}.`}
       </p>
-      {busy && <p role="status">Loading attendance…</p>}
-      {data && !busy && (
+      {busy && <p role="status">{data ? "Refreshing attendance…" : "Loading attendance…"}</p>}
+      {data && (
         <>
-          <div className="register-scroll" role="region" aria-label="Employee attendance grid" tabIndex={0}>
-            <table>
-              <caption style={{ textAlign: "left", padding: 12 }}>Attendance register · {data.from} to {data.to}</caption>
-              <thead><tr><th scope="col">Employee</th>{data.dates.map((date) => <th scope="col" key={date}>
+          <div className="register-frame">
+            <div id="attendance-register-title" className="register-title">Attendance register · {data.from} to {data.to}</div>
+            <div ref={registerScroll} className="register-scroll" role="region" aria-labelledby="attendance-register-title" tabIndex={0}>
+            <table aria-labelledby="attendance-register-title">
+              <thead><tr><th scope="col">Employee</th>{data.dates.map((date) => <th scope="col" key={date} data-date={date}>
                 <span>{dateHeading(date)}</span>
                 <div className="date-punch-headings" aria-hidden="true"><span>In · time & selfie</span><span>Out · time & selfie</span></div>
               </th>)}<th scope="col">Completed hours</th></tr></thead>
@@ -145,6 +167,7 @@ export function AttendancePage({ onView }: { onView: (employee: Employee) => voi
                 {!data.employees.length && <tr><td colSpan={data.dates.length + 2}>No employees match these filters.</td></tr>}
               </tbody>
             </table>
+            </div>
           </div>
           <div className="register-footer"><span className="register-note">{data.totalEmployees} employees · Uses the branch and search filters above · Refreshes every 30 seconds</span>
             <div className="register-pager"><Button disabled={page <= 1} onClick={() => setPage((v) => v - 1)}>Previous</Button><span>Page {page} of {pages}</span><Button disabled={page >= pages} onClick={() => setPage((v) => v + 1)}>Next</Button></div>
@@ -166,7 +189,7 @@ function GridPunch({ instant, attemptId, date, timezone, label, pending = false 
     {instant ? <time dateTime={instant} title={new Date(instant).toLocaleString("en-GB", { timeZone: timezone })}>
       {registerTime(instant, timezone)}{offset !== 0 && <span className="day-offset">{offset > 0 ? "+" : ""}{offset}d</span>}
     </time> : <span className="pending-punch">{pending ? "Pending" : "—"}</span>}
-    {attemptId ? <SelfieThumb attemptId={attemptId} label={label} size={56} lazy />
+    {attemptId ? <SelfieThumb attemptId={attemptId} label={label} size={40} lazy />
       : <span className="selfie-placeholder">{instant ? "No selfie" : "Awaiting out"}</span>}
   </div>;
 }

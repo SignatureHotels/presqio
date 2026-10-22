@@ -1,3 +1,4 @@
+import { AdminLoadingShell } from "@/layouts/admin-layout/AdminLoadingShell";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { EmployeePage } from "@/app/employee";
@@ -45,7 +46,7 @@ export function AppRouter() {
         element={
           <RequireAuth>
             <RequireWorkspace>
-              <Suspense fallback={<FullPageStatus label="Loading your workspace…" />}>
+              <Suspense fallback={<AdminLoadingShell />}>
                 <AdminWorkspace />
               </Suspense>
             </RequireWorkspace>

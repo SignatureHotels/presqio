@@ -57,6 +57,9 @@ const fromTime = (date: Date) => date.toISOString().slice(11, 16);
 export class AttendanceService {
   constructor(private readonly db: DatabaseService) {}
 
+  // Simultaneous employee-list and overview requests share work, but never cache attendance.
+  private readonly pendingToday = new Map<string, ReturnType<AttendanceService["loadToday"]>>();
+
   async timezoneOf(businessId: string) {
     const business = await this.db.businesses.findUniqueOrThrow({
       where: { id: businessId },
@@ -91,7 +94,16 @@ export class AttendanceService {
   }
 
   /** Today's attendance snapshot per employee id. */
-  async today(businessId: string) {
+  today(businessId: string) {
+    let pending = this.pendingToday.get(businessId);
+    if (!pending) {
+      pending = this.loadToday(businessId).finally(() => this.pendingToday.delete(businessId));
+      this.pendingToday.set(businessId, pending);
+    }
+    return pending;
+  }
+
+  private async loadToday(businessId: string) {
     const timezone = await this.timezoneOf(businessId);
     const date = localDate(timezone);
     const [sessions, shifts, leaves] = await Promise.all([
@@ -160,6 +172,7 @@ export class AttendanceService {
     return {
       date,
       timezone,
+      shifts,
       snapshotOf: (employeeId: string): TodaySnapshot => {
         const checkedIn = snapshots.get(employeeId);
         if (checkedIn) return checkedIn;
@@ -177,7 +190,7 @@ export class AttendanceService {
     const timezone = await this.timezoneOf(businessId);
     const date = localDate(timezone);
     const from = addDays(date, -(HISTORY_DAYS - 1));
-    const [employees, branches, sessions, shifts, today, logs, leaves] = await Promise.all([
+    const [employees, branches, sessions, today, logs, leaves] = await Promise.all([
       this.db.employees.findMany({
         where: { business_id: businessId, status: { in: ["PENDING", "ACTIVE"] } },
         select: {
@@ -201,7 +214,6 @@ export class AttendanceService {
         },
         select: { employee_id: true, work_date: true },
       }),
-      this.currentShifts(businessId, date),
       this.today(businessId),
       this.recentActivity(organizationId),
       this.db.leave_days.findMany({
@@ -213,6 +225,7 @@ export class AttendanceService {
         select: { employee_id: true, leave_date: true },
       }),
     ]);
+    const shifts = today.shifts;
     const onLeave = new Set(
       leaves.map((l) => `${l.employee_id}:${l.leave_date.toISOString().slice(0, 10)}`),
     );

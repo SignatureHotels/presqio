@@ -32,8 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore the session from the refresh cookie on first load.
   useEffect(() => {
-    subscribeToSession(apply);
-    void refreshSession().then(apply);
+    let active = true;
+    const unsubscribe = subscribeToSession(apply);
+    void refreshSession().then((session) => { if (active) apply(session); });
+    return () => { active = false; unsubscribe(); };
   }, [apply]);
 
   // Refresh shortly before the 15-minute access token expires.

@@ -21,3 +21,20 @@ test("admin refresh notifies the UI when authentication expires", async () => {
   assert.equal(await refreshSession(), null);
   assert.equal(notified, null);
 });
+
+test("successful HTML responses surface an API error instead of null screen data", async () => {
+  const { api } = await import("../src/api/client");
+  globalThis.fetch = async () => new Response("<html>Unavailable</html>");
+  await assert.rejects(api("/organizations/test"), /invalid response/);
+});
+
+test("concurrent admin refreshes share one request", async () => {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return Response.json({ accessToken: "fresh", user: {}, organizations: [] });
+  };
+  const [first, second] = await Promise.all([refreshSession(), refreshSession()]);
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+});
