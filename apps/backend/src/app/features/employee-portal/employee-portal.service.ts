@@ -63,6 +63,7 @@ export class EmployeePortalService {
       where: { id: ctx.employeeId },
       include: {
         business_id_ref: { include: { organization_id_ref: { select: { name: true } } } },
+        payroll_profile_row: { select: { department: true, date_of_birth: true } },
         employee_branch_assignments_employee_id_rows: { where: { effective_to: null }, take: 1 },
         shift_assignments_employee_id_rows: {
           where: { effective_to: null },
@@ -102,6 +103,11 @@ export class EmployeePortalService {
       name: employee.full_name,
       code: employee.employee_code,
       jobTitle: employee.job_title ?? "",
+      department: employee.payroll_profile_row?.department ?? "",
+      phone: employee.phone ?? "",
+      email: employee.email ?? "",
+      joinedOn: employee.joined_on?.toISOString().slice(0, 10) ?? null,
+      dateOfBirth: employee.payroll_profile_row?.date_of_birth?.toISOString().slice(0, 10) ?? null,
       organizationName: employee.business_id_ref.organization_id_ref.name,
       timezone,
       branch,

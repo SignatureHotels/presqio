@@ -1,6 +1,6 @@
 import { Button } from "@mui/material";
 import { initials } from "@/utils/format";
-import { zoneLabel } from "@/utils/dates";
+import { longDate, zoneLabel } from "@/utils/dates";
 import { useEmployeeSession } from "../../context/employee-session";
 import { MobileShell } from "../../components/mobile-shell";
 import { Panel } from "../../EmployeeApp.style";
@@ -12,6 +12,8 @@ export function ProfilePage() {
   if (!profile) return null;
   const rows: [string, string][] = [
     ["Organization", profile.organizationName],
+    ["Department", profile.department || "—"],
+    ["Date of joining", profile.joinedOn ? longDate(profile.joinedOn) : "—"],
     ["Branch", profile.branch?.name ?? "Not assigned"],
     [
       "Shift",
@@ -22,6 +24,9 @@ export function ProfilePage() {
     ["Check-in perimeter", profile.branch ? `${profile.branch.radius} m around the branch` : "—"],
     ["Time zone", zoneLabel(profile.timezone)],
     ["Sign-in", `Employee ID ${profile.code}`],
+    ["Phone", profile.phone || "Not provided"],
+    ["Email", profile.email || "Not provided"],
+    ["Date of birth", profile.dateOfBirth ? longDate(profile.dateOfBirth) : "—"],
   ];
   return (
     <MobileShell title="My profile" subtitle="Your workplace details">

@@ -30,6 +30,12 @@ export interface EmployeeProfile {
   name: string;
   code: string;
   jobTitle: string;
+  department: string;
+  phone: string;
+  email: string;
+  /** YYYY-MM-DD, or null when not recorded. */
+  joinedOn: string | null;
+  dateOfBirth: string | null;
   organizationName: string;
   timezone: string;
   branch: EmployeeBranchInfo | null;

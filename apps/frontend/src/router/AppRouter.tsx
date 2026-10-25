@@ -3,10 +3,10 @@ import { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { FullPageStatus, GuestOnly, RequireAuth, RequireWorkspace } from "./route-guards";
 import { lazyPage } from "./lazy-page";
+import { HomePage } from "@/app/public/home";
+import { LoginPage } from "@/app/auth/login/LoginPage";
 
 // Every area loads on demand, so visitors download only the part of the app they use.
-const HomePage = lazyPage(() => import("@/app/public/home"), "HomePage");
-const LoginPage = lazyPage(() => import("@/app/auth/login/LoginPage"), "LoginPage");
 const RegisterPage = lazyPage(() => import("@/app/auth/register/RegisterPage"), "RegisterPage");
 const ForgotPasswordPage = lazyPage(() => import("@/app/auth/forgot-password/ForgotPasswordPage"), "ForgotPasswordPage");
 const ResetPasswordPage = lazyPage(() => import("@/app/auth/reset-password/ResetPasswordPage"), "ResetPasswordPage");
@@ -18,19 +18,20 @@ const EmployeePage = lazyPage(() => import("@/app/employee"), "EmployeePage");
 const OwnerPage = lazyPage(() => import("@/app/owner"), "OwnerPage");
 const NotFoundPage = lazyPage(() => import("@/app/not-found"), "NotFoundPage");
 
+const pageFallback = <FullPageStatus label="Loading page…" />;
+
 export function AppRouter() {
   return (
-    <Suspense fallback={<FullPageStatus label="Loading…" />}>
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
-      <Route path="/register" element={<GuestOnly><RegisterPage /></GuestOnly>} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/register" element={<Suspense fallback={pageFallback}><GuestOnly><RegisterPage /></GuestOnly></Suspense>} />
+      <Route path="/forgot-password" element={<Suspense fallback={pageFallback}><ForgotPasswordPage /></Suspense>} />
+      <Route path="/reset-password" element={<Suspense fallback={pageFallback}><ResetPasswordPage /></Suspense>} />
+      <Route path="/verify-email" element={<Suspense fallback={pageFallback}><VerifyEmailPage /></Suspense>} />
       <Route
         path="/select-organization"
-        element={<RequireAuth><SelectOrganizationPage /></RequireAuth>}
+        element={<Suspense fallback={pageFallback}><RequireAuth><SelectOrganizationPage /></RequireAuth></Suspense>}
       />
       <Route
         path="/onboarding"
@@ -55,12 +56,11 @@ export function AppRouter() {
         }
       />
       {/* Employee portal (mobile). Sub-pages such as check-in will live under /employee/… */}
-      <Route path="/employee/*" element={<EmployeePage />} />
+      <Route path="/employee/*" element={<Suspense fallback={pageFallback}><EmployeePage /></Suspense>} />
       {/* Old address, kept so earlier links and saved home-screen icons still work. */}
       <Route path="/home" element={<Navigate to="/employee" replace />} />
-      <Route path="/owner/*" element={<OwnerPage />} />
-      <Route path="*" element={<NotFoundPage />} />
+      <Route path="/owner/*" element={<Suspense fallback={pageFallback}><OwnerPage /></Suspense>} />
+      <Route path="*" element={<Suspense fallback={pageFallback}><NotFoundPage /></Suspense>} />
     </Routes>
-    </Suspense>
   );
 }

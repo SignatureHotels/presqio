@@ -29,7 +29,8 @@ export function EmployeePage() {
 
 function EmployeeRoutes() {
   const { status } = useEmployeeSession();
-  if (status === "loading") return <Splash role="status">Loading…</Splash>;
+  // A returning employee may have a refresh cookie, but the sign-in UI does not
+  // depend on that lookup. Keep it visible while restoration happens.
   if (status !== "ready")
     return (
       <Routes>

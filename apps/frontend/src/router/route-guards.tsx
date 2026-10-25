@@ -42,7 +42,6 @@ export function RequireWorkspace({ children }: { children: ReactNode }) {
 /** Login/register pages send already signed-in admins to their workspace. */
 export function GuestOnly({ children }: { children: ReactNode }) {
   const { status, me, activeOrganization } = useAuth();
-  if (status === "loading") return <FullPageStatus label="Loading…" />;
   if (status === "authenticated" && me)
     return <Navigate to={landingPath(me, activeOrganization)} replace />;
   return <>{children}</>;
