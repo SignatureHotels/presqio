@@ -113,6 +113,17 @@ export const mailTemplates = {
       footnote: "This link expires in 24 hours and replaces any earlier link.",
     }),
 
+  ownerSignIn: (input: { name: string; signInUrl: string }) =>
+    layout({
+      subject: "Sign in to the Presqio owner console",
+      preheader: "Use this link within 15 minutes.",
+      heading: "Sign in to the owner console",
+      paragraphs: [`Hi ${firstName(input.name)}, tap the button below to open the Presqio owner console.`],
+      action: { label: "Sign in", url: input.signInUrl },
+      footnote:
+        "This link expires in 15 minutes and works once. If you didn't ask to sign in, ignore this email.",
+    }),
+
   resetPassword: (input: { name: string; resetUrl: string }) =>
     layout({
       subject: "Reset your Presqio password",

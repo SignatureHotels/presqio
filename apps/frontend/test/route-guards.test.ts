@@ -17,6 +17,7 @@ function renderGuard(status: AuthStatus, path = "/admin/attendance/live") {
     setActiveOrganization() {},
     async login() { throw new Error("Not used"); },
     async register() { throw new Error("Not used"); },
+    async ownerSignIn() { throw new Error("Not used"); },
     async logout() {},
     async reload() { return null; },
   };

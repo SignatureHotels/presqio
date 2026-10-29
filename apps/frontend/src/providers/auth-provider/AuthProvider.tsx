@@ -65,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveOrganization,
       login: async (request) => signIn(await authApi.login(request)),
       register: async (request) => signIn(await authApi.register(request)),
+      ownerSignIn: async (token) => signIn(await authApi.ownerSignIn(token)),
       logout: async () => {
         await authApi.logout().catch(() => undefined);
         setAccessToken(null);

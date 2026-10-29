@@ -16,6 +16,7 @@ const OnboardingPage = lazyPage(() => import("@/app/onboarding"), "OnboardingPag
 const AdminWorkspace = lazyPage(() => import("@/app/admin/AdminWorkspace"), "default");
 const EmployeePage = lazyPage(() => import("@/app/employee"), "EmployeePage");
 const OwnerPage = lazyPage(() => import("@/app/owner"), "OwnerPage");
+const OwnerSignInPage = lazyPage(() => import("@/app/owner"), "OwnerSignInPage");
 const NotFoundPage = lazyPage(() => import("@/app/not-found"), "NotFoundPage");
 const SuspendedPage = lazyPage(() => import("@/app/suspended"), "SuspendedPage");
 
@@ -64,11 +65,9 @@ export function AppRouter() {
         path="/owner/*"
         element={
           <Suspense fallback={pageFallback}>
-            <RequireAuth>
-              <RequirePlatformOwner fallback={<NotFoundPage />}>
-                <OwnerPage />
-              </RequirePlatformOwner>
-            </RequireAuth>
+            <RequirePlatformOwner signIn={<OwnerSignInPage />} fallback={<NotFoundPage />}>
+              <OwnerPage />
+            </RequirePlatformOwner>
           </Suspense>
         }
       />

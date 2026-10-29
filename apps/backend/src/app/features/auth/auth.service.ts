@@ -18,7 +18,7 @@ import {
   normalizeEmail,
 } from "../../common/security/tokens";
 import { SessionsService, type ClientInfo } from "../../common/auth/sessions.service";
-import { isPlatformOwner } from "../../common/auth/platform-owner.guard";
+import { isPlatformOwner, platformOwnerEmails } from "../../common/auth/platform-owner.guard";
 import { ConfigService } from "@nestjs/config";
 import { OrganizationsService } from "../organizations/organizations.service";
 
@@ -31,6 +31,7 @@ const MAX_FAILED_LOGINS = 5;
 const LOCK_MINUTES = 15;
 const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000;
 const RESET_PASSWORD_TTL_MS = 30 * 60 * 1000;
+const SIGN_IN_LINK_TTL_MS = 15 * 60 * 1000;
 /** Per user and purpose, so the reset/verify endpoints cannot be used to flood an inbox. */
 const MAX_EMAILS_PER_HOUR = 3;
 
@@ -187,6 +188,40 @@ export class AuthService {
         resetUrl: this.mail.link("/reset-password", token),
       }),
     );
+  }
+
+  /**
+   * Owner console sign-in needs only the inbox: listed platform owners get a one-tap link,
+   * and their account is created on first use. Other emails get the same silent success.
+   */
+  async ownerSignInLink(emailInput: string) {
+    const email = normalizeEmail(emailInput);
+    if (!platformOwnerEmails(this.config).has(email)) return;
+    const user =
+      (await this.db.users.findUnique({ where: { email } })) ??
+      (await this.db.users.create({ data: { display_name: "Presqio Team", email } }));
+    if (user.status !== "ACTIVE") return;
+    const token = await this.createToken(user.id, "SIGN_IN_LINK", SIGN_IN_LINK_TTL_MS);
+    if (!token) return;
+    this.mail.queue(
+      email,
+      mailTemplates.ownerSignIn({ name: user.display_name, signInUrl: this.mail.link("/owner", token) }),
+    );
+  }
+
+  async ownerSignIn(token: string, client: ClientInfo): Promise<IssuedSession> {
+    const record = await this.consumeToken(token, "SIGN_IN_LINK");
+    const user = await this.db.users.findUniqueOrThrow({ where: { id: record.user_id } });
+    // The list may have changed since the link was sent.
+    if (user.status !== "ACTIVE" || !user.email || !platformOwnerEmails(this.config).has(user.email))
+      throw new BadRequestException("This link is invalid or has expired");
+    const now = new Date();
+    await this.db.users.update({
+      where: { id: user.id },
+      // Opening the emailed link proves control of the mailbox.
+      data: { last_login_at: now, email_verified_at: user.email_verified_at ?? now },
+    });
+    return this.issueSession(user.id, client);
   }
 
   /** Sets a new password and signs out every existing session. */

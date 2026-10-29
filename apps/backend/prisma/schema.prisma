@@ -43,6 +43,7 @@ enum OnboardingStep {
 enum AuthTokenPurpose {
   VERIFY_EMAIL
   RESET_PASSWORD
+  SIGN_IN_LINK
 }
 
 enum SessionKind {

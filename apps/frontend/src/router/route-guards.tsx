@@ -30,10 +30,24 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** The owner console is for Presqio staff only; anyone else gets the ordinary not-found page. */
-export function RequirePlatformOwner({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
-  const { me } = useAuth();
-  if (!me) return null;
+/**
+ * The owner console signs in by emailed link, so signed-out visitors (and anyone opening a
+ * link) get the owner sign-in screen; signed-in non-owners get the ordinary not-found page.
+ */
+export function RequirePlatformOwner({
+  children,
+  signIn,
+  fallback,
+}: {
+  children: ReactNode;
+  signIn: ReactNode;
+  fallback: ReactNode;
+}) {
+  const { status, me } = useAuth();
+  const location = useLocation();
+  if (new URLSearchParams(location.search).has("token")) return <>{signIn}</>;
+  if (status === "loading") return <FullPageStatus label="Checking your session…" />;
+  if (status === "anonymous" || !me) return <>{signIn}</>;
   return <>{me.user.isPlatformOwner ? children : fallback}</>;
 }
 

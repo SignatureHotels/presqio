@@ -16,6 +16,8 @@ export interface AuthState {
   setActiveOrganization: (organizationId: string) => void;
   login: (request: LoginRequest) => Promise<MeResponse>;
   register: (request: RegisterRequest) => Promise<MeResponse>;
+  /** Signs a Presqio owner in with the one-tap link emailed to them. */
+  ownerSignIn: (token: string) => Promise<MeResponse>;
   logout: () => Promise<void>;
   /** Re-reads memberships and onboarding progress after a change. */
   reload: () => Promise<MeResponse | null>;

@@ -6,6 +6,7 @@ import { NotFoundException, type ExecutionContext } from "@nestjs/common";
 import { subscriptionProblem } from "../src/app/common/billing/subscription";
 import { PlatformOwnerGuard } from "../src/app/common/auth/platform-owner.guard";
 import { clientState } from "../src/app/features/owner/owner.service";
+import { AuthService } from "../src/app/features/auth/auth.service";
 import { validateEnvironment } from "../src/app/common/config/environment";
 import type { DatabaseService } from "../src/app/common/database/database.service";
 
@@ -62,4 +63,35 @@ test("only verified, listed Presqio staff open the owner console; everyone else 
     undefined,
   ])
     await assert.rejects(guard.canActivate(context(user)), NotFoundException);
+});
+
+test("owner sign-in links go only to listed owners, creating the account on first use", async () => {
+  const created: { email: string }[] = [];
+  const sent: { to: string; text: string }[] = [];
+  const db = {
+    users: {
+      findUnique: async () => null,
+      create: async ({ data }: { data: { email: string; display_name: string } }) => {
+        created.push(data);
+        return { id: "u1", status: "ACTIVE", ...data };
+      },
+    },
+    auth_tokens: { count: async () => 0, updateMany: () => ({}), create: () => ({}) },
+    $transaction: async (ops: unknown[]) => ops,
+  };
+  const mail = {
+    queue: (to: string, mail: { text: string }) => sent.push({ to, text: mail.text }),
+    link: (path: string, token: string) => `https://presqio.pages.dev${path}?token=${token}`,
+  };
+  const config = { get: (key: string) => (key === "PLATFORM_OWNER_EMAILS" ? "presqio.team@gmail.com" : undefined) };
+  const auth = new AuthService(db as never, {} as never, {} as never, mail as never, {} as never, config as never);
+
+  await auth.ownerSignInLink("someone@hotel.in");
+  assert.equal(created.length, 0);
+  assert.equal(sent.length, 0);
+
+  await auth.ownerSignInLink(" Presqio.Team@gmail.com ");
+  assert.equal(created[0].email, "presqio.team@gmail.com");
+  assert.equal(sent[0].to, "presqio.team@gmail.com");
+  assert.match(sent[0].text, /presqio\.pages\.dev\/owner\?token=/);
 });

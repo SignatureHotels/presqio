@@ -117,6 +117,26 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(202)
+  @Post("owner/sign-in-link")
+  ownerSignInLink(@Body() dto: ForgotPasswordDto) {
+    return this.auth.ownerSignInLink(dto.email);
+  }
+
+  @Public()
+  @Throttle(STRICT)
+  @HttpCode(200)
+  @Post("owner/sign-in")
+  async ownerSignIn(
+    @Body() dto: VerifyEmailDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthSessionResponse> {
+    return this.withCookie(res, await this.auth.ownerSignIn(dto.token, client(req)));
+  }
+
+  @Public()
   @Throttle(STRICT)
   @HttpCode(204)
   @Post("reset-password")

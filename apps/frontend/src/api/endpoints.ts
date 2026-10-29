@@ -36,6 +36,10 @@ export const authApi = {
     api<void>("/auth/resend-verification", { method: "POST" }),
   forgotPassword: (email: string) =>
     api<void>("/auth/forgot-password", { method: "POST", body: { email } }),
+  ownerSignInLink: (email: string) =>
+    api<void>("/auth/owner/sign-in-link", { method: "POST", body: { email } }),
+  ownerSignIn: (token: string) =>
+    api<AuthSessionResponse>("/auth/owner/sign-in", { method: "POST", body: { token } }),
   resetPassword: (token: string, password: string) =>
     api<void>("/auth/reset-password", {
       method: "POST",
