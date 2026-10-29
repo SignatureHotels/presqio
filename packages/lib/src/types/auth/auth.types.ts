@@ -30,6 +30,8 @@ export interface CurrentUser {
   displayName: string;
   email: string;
   emailVerified: boolean;
+  /** Presqio staff who may open the owner console (/owner). */
+  isPlatformOwner?: boolean;
 }
 /** A business the user can open, with the role that grants access. */
 export interface AccessibleBusiness extends BusinessSummary {
@@ -45,6 +47,8 @@ export interface OrganizationAccess extends OrganizationSummary {
 export interface MeResponse {
   user: CurrentUser;
   organizations: OrganizationAccess[];
+  /** Names of the user's organizations that Presqio has suspended (they can't be opened). */
+  suspendedOrganizations?: string[];
 }
 /** Returned by register, login and refresh. The refresh token is only ever in an httpOnly cookie. */
 export interface AuthSessionResponse extends MeResponse {

@@ -1,7 +1,7 @@
 import { AdminLoadingShell } from "@/layouts/admin-layout/AdminLoadingShell";
 import { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { FullPageStatus, GuestOnly, RequireAuth, RequireWorkspace } from "./route-guards";
+import { FullPageStatus, GuestOnly, RequireAuth, RequirePlatformOwner, RequireWorkspace } from "./route-guards";
 import { lazyPage } from "./lazy-page";
 import { HomePage } from "@/app/public/home";
 import { LoginPage } from "@/app/auth/login/LoginPage";
@@ -17,6 +17,7 @@ const AdminWorkspace = lazyPage(() => import("@/app/admin/AdminWorkspace"), "def
 const EmployeePage = lazyPage(() => import("@/app/employee"), "EmployeePage");
 const OwnerPage = lazyPage(() => import("@/app/owner"), "OwnerPage");
 const NotFoundPage = lazyPage(() => import("@/app/not-found"), "NotFoundPage");
+const SuspendedPage = lazyPage(() => import("@/app/suspended"), "SuspendedPage");
 
 const pageFallback = <FullPageStatus label="Loading page…" />;
 
@@ -59,7 +60,19 @@ export function AppRouter() {
       <Route path="/employee/*" element={<Suspense fallback={pageFallback}><EmployeePage /></Suspense>} />
       {/* Old address, kept so earlier links and saved home-screen icons still work. */}
       <Route path="/home" element={<Navigate to="/employee" replace />} />
-      <Route path="/owner/*" element={<Suspense fallback={pageFallback}><OwnerPage /></Suspense>} />
+      <Route
+        path="/owner/*"
+        element={
+          <Suspense fallback={pageFallback}>
+            <RequireAuth>
+              <RequirePlatformOwner fallback={<NotFoundPage />}>
+                <OwnerPage />
+              </RequirePlatformOwner>
+            </RequireAuth>
+          </Suspense>
+        }
+      />
+      <Route path="/suspended" element={<Suspense fallback={pageFallback}><RequireAuth><SuspendedPage /></RequireAuth></Suspense>} />
       <Route path="*" element={<Suspense fallback={pageFallback}><NotFoundPage /></Suspense>} />
     </Routes>
   );

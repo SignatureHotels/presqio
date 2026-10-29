@@ -33,6 +33,8 @@ const schema = z
     GMAIL_CLIENT_ID: optional(z.string().trim().min(1)),
     GMAIL_CLIENT_SECRET: optional(z.string().trim().min(1)),
     GMAIL_REFRESH_TOKEN: optional(z.string().trim().min(1)),
+    /** Presqio staff who may open the owner console; defaults to GMAIL_USER. Comma-separated. */
+    PLATFORM_OWNER_EMAILS: optional(z.string().trim().min(3)),
     /** Where new sign-ups are reported; defaults to GMAIL_USER. Comma-separate several addresses. */
     ADMIN_NOTIFY_EMAIL: optional(z.string().trim().min(3)),
     /** HTTPS mail transport, preferred over SMTP when configured (works on Render Free). */
@@ -54,6 +56,7 @@ const schema = z
     ...env,
     APP_URL: env.APP_URL ?? env.UI_ORIGIN,
     ADMIN_NOTIFY_EMAIL: env.ADMIN_NOTIFY_EMAIL ?? env.GMAIL_USER,
+    PLATFORM_OWNER_EMAILS: env.PLATFORM_OWNER_EMAILS ?? env.GMAIL_USER,
     JWT_SECRET: env.JWT_SECRET ?? env.JWT_ACCESS_SECRET ?? DEV_JWT_SECRET,
     // Gmail shows app passwords in groups of four; the spaces are not part of it.
     SMTP_PASS: env.SMTP_PASS?.replace(/\s+/g, ""),

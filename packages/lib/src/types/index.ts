@@ -10,3 +10,4 @@ export type * from "./audit";
 export type * from "./health";
 export type * from "./employee-portal";
 export type * from "./payroll";
+export type * from "./owner";

@@ -50,6 +50,17 @@ export function Sidebar({ loading = false }: { loading?: boolean }) {
       </nav>
       <GroupName spaced>Management</GroupName>
       <nav aria-label="Management">{navigation(adminNavigation.slice(2))}</nav>
+      {auth.me?.user.isPlatformOwner && (
+        <>
+          <GroupName spaced>Presqio</GroupName>
+          <nav aria-label="Presqio">
+            <SideItem to="/owner" title="Owner console" aria-label="Owner console">
+              <Icon name="report" />
+              <ItemLabel>Owner console</ItemLabel>
+            </SideItem>
+          </nav>
+        </>
+      )}
       <Spacer />
       <HelpCard>
         <Icon name="shield" />

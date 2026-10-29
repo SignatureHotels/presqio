@@ -30,6 +30,13 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** The owner console is for Presqio staff only; anyone else gets the ordinary not-found page. */
+export function RequirePlatformOwner({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
+  const { me } = useAuth();
+  if (!me) return null;
+  return <>{me.user.isPlatformOwner ? children : fallback}</>;
+}
+
 /** The admin workspace needs a chosen organization that has finished setup. */
 export function RequireWorkspace({ children }: { children: ReactNode }) {
   const { me, activeOrganization } = useAuth();

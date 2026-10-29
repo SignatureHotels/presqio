@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { subscriptionProblem, type SubscriptionRow } from "../../common/billing/subscription";
 import { Prisma } from "@prisma/client";
 import type { BranchRecord } from "@presqio/lib";
 import type { OrganizationContext, RequestUser } from "../../common/auth/auth.types";
@@ -64,13 +65,13 @@ export class BranchesService {
     try {
       branchId = await this.db.$transaction(async (tx) => {
         // Serialize with other creates in this organization so the plan limit holds.
-        const [plan] = await tx.$queryRaw<{ max_branches: number | null; status: string }[]>`
-          SELECT p.max_branches, s.status FROM subscriptions s
+        const [plan] = await tx.$queryRaw<({ max_branches: number | null } & SubscriptionRow)[]>`
+          SELECT p.max_branches, s.status, s.trial_ends_at, s.current_period_end FROM subscriptions s
             JOIN plans p ON p.code = s.plan_code
            WHERE s.organization_id = ${org.organizationId}::uuid
            FOR UPDATE OF s`;
-        if (!plan || plan.status === "CANCELED")
-          throw new ForbiddenException("This organization has no active subscription");
+        const problem = subscriptionProblem(plan);
+        if (problem) throw new ForbiddenException(problem);
         if (plan.max_branches !== null) {
           const count = await tx.branches.count({
             where: { business_id_ref: { organization_id: org.organizationId } },

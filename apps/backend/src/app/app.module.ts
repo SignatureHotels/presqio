@@ -25,6 +25,7 @@ import { AuditModule } from "./features/audit/audit.module";
 import { PrivacyModule } from "./features/privacy/privacy.module";
 import { EmployeeAuthModule } from "./features/employee-auth/employee-auth.module";
 import { EmployeePortalModule } from "./features/employee-portal/employee-portal.module";
+import { OwnerModule } from "./features/owner/owner.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
@@ -51,6 +52,7 @@ import { EmployeePortalModule } from "./features/employee-portal/employee-portal
     PrivacyModule,
     EmployeeAuthModule,
     EmployeePortalModule,
+    OwnerModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

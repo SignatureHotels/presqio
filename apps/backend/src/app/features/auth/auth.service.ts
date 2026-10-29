@@ -18,6 +18,8 @@ import {
   normalizeEmail,
 } from "../../common/security/tokens";
 import { SessionsService, type ClientInfo } from "../../common/auth/sessions.service";
+import { isPlatformOwner } from "../../common/auth/platform-owner.guard";
+import { ConfigService } from "@nestjs/config";
 import { OrganizationsService } from "../organizations/organizations.service";
 
 export type { ClientInfo };
@@ -46,6 +48,7 @@ export class AuthService {
     private readonly passwords: PasswordService,
     private readonly mail: MailService,
     private readonly organizations: OrganizationsService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto, client: ClientInfo): Promise<IssuedSession> {
@@ -262,6 +265,11 @@ export class AuthService {
         business_memberships_user_id_rows: { select: { business_id: true, role: true } },
       },
     });
+    // Suspended workspaces are left out of `organizations`; name them so the app can explain why.
+    const suspended = await this.db.organization_memberships.findMany({
+      where: { user_id: userId, status: "ACTIVE", organization_id_ref: { status: "DISABLED" } },
+      select: { organization_id_ref: { select: { name: true } } },
+    });
     const businessRoles = new Map(
       user.business_memberships_user_id_rows.map((m) => [m.business_id, m.role]),
     );
@@ -271,7 +279,9 @@ export class AuthService {
         displayName: user.display_name,
         email: user.email ?? "",
         emailVerified: Boolean(user.email_verified_at),
+        isPlatformOwner: isPlatformOwner(this.config, user),
       },
+      suspendedOrganizations: suspended.map((m) => m.organization_id_ref.name),
       organizations: user.organization_memberships_user_id_rows.map(
         ({ role, organization_id_ref: org }) => ({
           id: org.id,

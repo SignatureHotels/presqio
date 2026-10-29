@@ -33,7 +33,12 @@ export function resolveActiveOrganization(
 
 /** Where an admin should land after signing in, given their memberships. */
 export function landingPath(me: MeResponse, active: OrganizationAccess | null) {
-  if (me.organizations.length === 0) return "/onboarding";
+  if (me.organizations.length === 0) {
+    if (me.suspendedOrganizations?.length) return "/suspended";
+    // Presqio staff without a workspace of their own go straight to the owner console
+    if (me.user.isPlatformOwner) return "/owner";
+    return "/onboarding";
+  }
   if (!active) return "/select-organization";
   if (active.onboardingStep !== "COMPLETED") return "/onboarding";
   return "/admin/overview";
