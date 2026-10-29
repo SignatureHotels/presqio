@@ -7,6 +7,7 @@ import { ownerApi } from "@/api/owner";
 import { Icon } from "@/components";
 import { useAuth } from "@/hooks/use-auth";
 import { ClientDrawer } from "./ClientDrawer";
+import { DeleteClientDialog } from "./DeleteClientDialog";
 import {
   BarAxis,
   Bars,
@@ -56,6 +57,8 @@ export function OwnerPage() {
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
+  const [notice, setNotice] = useState("");
   const [loadingList, setLoadingList] = useState(true);
 
   const loadOverview = useCallback(() => {
@@ -214,6 +217,11 @@ export function OwnerPage() {
             <h2 id="clients-title">Clients</h2>
             <span className="panel-note">{list ? `${list.total} shown` : ""}</span>
           </div>
+          {notice && (
+            <Alert severity="success" onClose={() => setNotice("")} sx={{ mb: 1.5 }}>
+              {notice}
+            </Alert>
+          )}
 
           <StateTabs role="tablist" aria-label="Filter by status">
             {TABS.map((s) => (
@@ -262,6 +270,7 @@ export function OwnerPage() {
                       <th className="num">Staff</th>
                       <th className="num hide-laptop">Check-ins 7d</th>
                       <th>Last active</th>
+                      <th className="actions"><span className="sr-only">Delete</span></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -296,6 +305,17 @@ export function OwnerPage() {
                           <td className="num">{c.employees}</td>
                           <td className="num hide-laptop">{c.checkins7d}</td>
                           <td>{ago(c.lastActivityAt)}</td>
+                          <td className="actions">
+                            <button
+                              className="row-delete"
+                              title={`Delete ${c.name}`}
+                              aria-label={`Delete ${c.name}`}
+                              onClick={(e) => { e.stopPropagation(); setDeleting({ id: c.id, name: c.name }); }}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            >
+                              <Icon name="trash" />
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -334,7 +354,26 @@ export function OwnerPage() {
         </Panel>
       </Main>
 
-      <ClientDrawer clientId={selected} plans={plans} onClose={() => setSelected(null)} onChanged={refresh} />
+      <ClientDrawer
+        clientId={selected}
+        plans={plans}
+        onClose={() => setSelected(null)}
+        onChanged={refresh}
+        onDelete={setDeleting}
+      />
+      <DeleteClientDialog
+        client={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={(result) => {
+          setDeleting(null);
+          setSelected(null);
+          setNotice(
+            `${result.name} was deleted: ${result.branches} branch${result.branches === 1 ? "" : "es"}, ` +
+              `${result.employees} employee${result.employees === 1 ? "" : "s"} and all their records.`,
+          );
+          refresh();
+        }}
+      />
     </Shell>
   );
 }

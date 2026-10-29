@@ -101,3 +101,14 @@ export interface UpdateClientSubscriptionRequest {
   /** Paid until this date (sets the status to ACTIVE when given). */
   paidUntil?: ISODateTime;
 }
+
+/** What the owner console removed when it deleted a client. */
+export interface DeletedClient {
+  name: string;
+  businesses: number;
+  branches: number;
+  employees: number;
+  photos: number;
+  /** Sign-in accounts removed because they belonged to no other client. */
+  accounts: number;
+}

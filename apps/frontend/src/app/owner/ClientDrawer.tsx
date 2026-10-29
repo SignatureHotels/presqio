@@ -22,11 +22,13 @@ export function ClientDrawer({
   plans,
   onClose,
   onChanged,
+  onDelete,
 }: {
   clientId: string | null;
   plans: OwnerPlan[];
   onClose: () => void;
   onChanged: () => void;
+  onDelete: (client: { id: string; name: string }) => void;
 }) {
   const [client, setClient] = useState<OwnerClientDetail | null>(null);
   const [error, setError] = useState("");
@@ -257,8 +259,12 @@ export function ClientDrawer({
                 ) : (
                   <button className="btn danger" disabled={Boolean(busy)} onClick={() => setConfirm("suspend")}>Suspend workspace</button>
                 )}
+                <button className="btn danger-solid" disabled={Boolean(busy)} onClick={() => onDelete({ id, name: client.name })}>
+                  Delete client permanently
+                </button>
                 <div className="hint">
                   Suspending blocks their admins and staff check-ins until you reactivate. Their data is kept.
+                  Deleting removes the client and all of their data for good.
                 </div>
               </ActionGrid>
             </DrawerSection>

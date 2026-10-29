@@ -1,5 +1,6 @@
 import type {
   ClientState,
+  DeletedClient,
   OwnerClientDetail,
   OwnerClientList,
   OwnerOverview,
@@ -30,6 +31,9 @@ export const ownerApi = {
   suspend: (id: string, reason: string) =>
     api<OwnerClientDetail>(`/owner/clients/${id}/suspend`, { method: "POST", body: { reason } }),
   reactivate: (id: string) => api<OwnerClientDetail>(`/owner/clients/${id}/reactivate`, { method: "POST" }),
+  /** Permanent. `confirmName` must equal the business name. */
+  deleteClient: (id: string, confirmName: string) =>
+    api<DeletedClient>(`/owner/clients/${id}`, { method: "DELETE", body: { confirmName } }),
   resendVerification: (id: string) =>
     api<{ sent: boolean }>(`/owner/clients/${id}/resend-verification`, { method: "POST" }),
 };

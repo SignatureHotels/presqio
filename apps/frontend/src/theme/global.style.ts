@@ -247,6 +247,14 @@ export const globalStyles: CSSObject[] = [
     },
   },
   {
+    ".btn.danger-solid": {
+      background: "var(--error)",
+      color: "#fff",
+      borderColor: "var(--error)",
+    },
+    ".btn:disabled": { opacity: 0.5, cursor: "not-allowed" },
+  },
+  {
     ".btn:hover": {
       filter: "brightness(0.98)",
     },

@@ -1,10 +1,10 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import type { OwnerClientDetail, OwnerClientList, OwnerOverview, OwnerPlan } from "@presqio/lib";
+import type { DeletedClient, OwnerClientDetail, OwnerClientList, OwnerOverview, OwnerPlan } from "@presqio/lib";
 import { CurrentUser } from "../../common/auth/auth.decorators";
 import type { RequestUser } from "../../common/auth/auth.types";
 import { PlatformOwnerGuard } from "../../common/auth/platform-owner.guard";
-import { ClientListQueryDto, SuspendClientDto, UpdateClientSubscriptionDto } from "./owner.dto";
+import { ClientListQueryDto, DeleteClientDto, SuspendClientDto, UpdateClientSubscriptionDto } from "./owner.dto";
 import { OwnerService } from "./owner.service";
 
 /** Presqio's own console over every client. Only PLATFORM_OWNER_EMAILS get in; others see 404. */
@@ -58,6 +58,17 @@ export class OwnerController {
   @HttpCode(200)
   reactivate(@Param("organizationId", ParseUUIDPipe) id: string, @CurrentUser() user: RequestUser): Promise<OwnerClientDetail> {
     return this.owner.setSuspended(id, false, user.userId);
+  }
+
+  /** Permanent: removes the client and all of its data. */
+  @Delete("clients/:organizationId")
+  @HttpCode(200)
+  deleteClient(
+    @Param("organizationId", ParseUUIDPipe) id: string,
+    @Body() dto: DeleteClientDto,
+    @CurrentUser() user: RequestUser,
+  ): Promise<DeletedClient> {
+    return this.owner.deleteClient(id, dto.confirmName, user.userId);
   }
 
   @Post("clients/:organizationId/resend-verification")

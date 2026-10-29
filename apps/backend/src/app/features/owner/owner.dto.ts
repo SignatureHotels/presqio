@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import { IsIn, IsInt, IsISO8601, IsOptional, IsString, Length, Max, MaxLength, Min } from "class-validator";
 import type { ClientState, SubscriptionStatusCode } from "@presqio/lib";
@@ -51,4 +51,9 @@ export class UpdateClientSubscriptionDto {
 export class SuspendClientDto {
   @ApiPropertyOptional({ example: "Payment overdue" }) @IsOptional() @IsString() @MaxLength(200)
   reason?: string;
+}
+
+export class DeleteClientDto {
+  @ApiProperty({ description: "The business name, typed to confirm" }) @IsString() @MaxLength(200)
+  confirmName!: string;
 }

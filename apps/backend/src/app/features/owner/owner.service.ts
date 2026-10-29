@@ -1,7 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
 import type {
   ClientState,
+  DeletedClient,
   OwnerClient,
   OwnerClientContact,
   OwnerClientDetail,
@@ -10,7 +12,9 @@ import type {
   OwnerPlan,
   SubscriptionStatusCode,
 } from "@presqio/lib";
+import { platformOwnerEmails } from "../../common/auth/platform-owner.guard";
 import { DatabaseService } from "../../common/database/database.service";
+import { PhotoStorageService } from "../../common/storage/photo-storage.service";
 import { AuditService } from "../audit/audit.service";
 import { AuthService } from "../auth/auth.service";
 import type { ClientListQueryDto, UpdateClientSubscriptionDto } from "./owner.dto";
@@ -80,7 +84,11 @@ export class OwnerService {
     private readonly db: DatabaseService,
     private readonly audit: AuditService,
     private readonly auth: AuthService,
+    private readonly storage: PhotoStorageService,
+    private readonly config: ConfigService,
   ) {}
+
+  private readonly logger = new Logger("Owner");
 
   plans(): Promise<OwnerPlan[]> {
     return this.db.plans
@@ -288,6 +296,119 @@ export class OwnerService {
       });
     }
     return this.client(organizationId);
+  }
+
+  /**
+   * Permanently removes a client: every business, branch, employee, check-in, selfie and payroll
+   * record, plus the accounts that belonged only to it. The typed name guards against misclicks.
+   */
+  async deleteClient(organizationId: string, confirmName: string, actorId: string): Promise<DeletedClient> {
+    const org = await this.db.organizations.findUnique({ where: { id: organizationId }, select: { name: true } });
+    if (!org) throw new NotFoundException("Client not found");
+    if (confirmName.trim() !== org.name.trim())
+      throw new BadRequestException("Type the business name exactly to confirm");
+
+    const businessIds = (
+      await this.db.businesses.findMany({ where: { organization_id: organizationId }, select: { id: true } })
+    ).map((b) => b.id);
+    const inBusinesses = { business_id: { in: businessIds } };
+    const [photos, people] = await Promise.all([
+      this.db.attendance_photos.findMany({ where: { ...inBusinesses, storage_key: { not: null } }, select: { storage_key: true } }),
+      Promise.all([
+        this.db.organization_memberships.findMany({ where: { organization_id: organizationId }, select: { user_id: true } }),
+        this.db.business_memberships.findMany({ where: inBusinesses, select: { user_id: true } }),
+        this.db.employees.findMany({ where: { ...inBusinesses, user_id: { not: null } }, select: { user_id: true } }),
+      ]),
+    ]);
+    const candidates = [...new Set(people.flat().map((row) => row.user_id!))].filter((id) => id !== actorId);
+
+    const result = await this.db.$transaction(
+      async (tx) => {
+        // Lets the append-only triggers accept these deletes, for this transaction only.
+        await tx.$executeRaw`SELECT set_config('presqio.purging', 'on', true)`;
+        const b = { where: inBusinesses };
+        // Children before parents: every foreign key here is ON DELETE RESTRICT.
+        await tx.face_checks.deleteMany(b);
+        await tx.location_checks.deleteMany(b);
+        await tx.attendance_photos.deleteMany(b);
+        await tx.attendance_events.deleteMany(b);
+        await tx.approvals.deleteMany(b);
+        await tx.attendance_adjustments.deleteMany(b);
+        await tx.attendance_corrections.deleteMany(b);
+        await tx.attendance_sessions.deleteMany(b);
+        await tx.attendance_attempts.deleteMany(b);
+        await tx.face_enrollments.deleteMany(b);
+        await tx.shift_assignments.deleteMany(b);
+        await tx.shifts.deleteMany(b);
+        await tx.payroll_payments.deleteMany(b);
+        await tx.payroll_items.deleteMany(b);
+        await tx.payroll_runs.deleteMany(b);
+        await tx.payroll_compensations.deleteMany(b);
+        await tx.employee_payroll_profiles.deleteMany(b);
+        await tx.payroll_settings.deleteMany(b);
+        await tx.leave_days.deleteMany(b);
+        await tx.privacy_acknowledgements.deleteMany(b);
+        await tx.privacy_notices.deleteMany(b);
+        await tx.employee_branch_assignments.deleteMany(b);
+        await tx.activation_tokens.deleteMany(b);
+        await tx.business_membership_branches.deleteMany(b);
+        await tx.business_memberships.deleteMany(b);
+        await tx.geofences.deleteMany(b);
+        await tx.calendars.deleteMany(b);
+        await tx.report_jobs.deleteMany(b);
+        await tx.retention_jobs.deleteMany(b);
+        await tx.notification_jobs.deleteMany(b);
+        const byOrg = { where: { organization_id: organizationId } };
+        await tx.invitations.deleteMany(byOrg);
+        await tx.audit_logs.deleteMany(byOrg);
+        const employees = await tx.employees.deleteMany(b);
+        const branches = await tx.branches.deleteMany(b);
+        await tx.businesses.deleteMany(byOrg);
+        await tx.subscriptions.deleteMany(byOrg);
+        await tx.organization_memberships.deleteMany(byOrg);
+        await tx.organizations.delete({ where: { id: organizationId } });
+
+        // Accounts go too, unless they still belong to another client or are Presqio staff.
+        const keep = new Set<string>();
+        const anyOf = { in: candidates };
+        const stillUsed = await Promise.all([
+          tx.organization_memberships.findMany({ where: { user_id: anyOf }, select: { user_id: true } }),
+          tx.business_memberships.findMany({ where: { user_id: anyOf }, select: { user_id: true } }),
+          tx.employees.findMany({ where: { user_id: anyOf }, select: { user_id: true } }),
+          tx.notification_jobs.findMany({ where: { user_id: anyOf }, select: { user_id: true } }),
+          tx.audit_logs.findMany({ where: { actor_id: anyOf }, select: { actor_id: true } }),
+          tx.invitations.findMany({ where: { invited_by: anyOf }, select: { invited_by: true } }),
+          tx.activation_tokens.findMany({ where: { issued_by: anyOf }, select: { issued_by: true } }),
+          tx.attendance_corrections.findMany({ where: { OR: [{ requester_id: anyOf }, { reviewer_id: anyOf }] }, select: { requester_id: true, reviewer_id: true } }),
+          tx.approvals.findMany({ where: { reviewer_id: anyOf }, select: { reviewer_id: true } }),
+          tx.attendance_adjustments.findMany({ where: { approved_by: anyOf }, select: { approved_by: true } }),
+          tx.face_enrollments.findMany({ where: { approved_by: anyOf }, select: { approved_by: true } }),
+          tx.report_jobs.findMany({ where: { requested_by: anyOf }, select: { requested_by: true } }),
+        ]);
+        for (const row of stillUsed.flat()) for (const id of Object.values(row)) if (id) keep.add(id);
+        const staff = platformOwnerEmails(this.config);
+        const users = await tx.users.findMany({ where: { id: anyOf }, select: { id: true, email: true } });
+        const removable = users.filter((u) => !keep.has(u.id) && !(u.email && staff.has(u.email))).map((u) => u.id);
+        const mine = { where: { user_id: { in: removable } } };
+        await tx.sessions.deleteMany(mine);
+        await tx.auth_tokens.deleteMany(mine);
+        await tx.credentials.deleteMany(mine);
+        await tx.users.deleteMany({ where: { id: { in: removable } } });
+        return { employees: employees.count, branches: branches.count, accounts: removable.length };
+      },
+      { timeout: 120_000, maxWait: 10_000 },
+    );
+
+    // Selfies in B2 are removed after the database commit; any miss is cleared by the lifecycle rule.
+    if (this.storage.enabled)
+      for (let i = 0; i < photos.length; i += 20)
+        await Promise.all(photos.slice(i, i + 20).map((p) => this.storage.remove(p.storage_key!)));
+
+    this.logger.log(
+      `Client "${org.name}" deleted by ${actorId}: ${businessIds.length} businesses, ${result.branches} branches, ` +
+        `${result.employees} employees, ${photos.length} photos, ${result.accounts} accounts`,
+    );
+    return { name: org.name, businesses: businessIds.length, photos: photos.length, ...result };
   }
 
   async resendVerification(organizationId: string, actorId: string) {

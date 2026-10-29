@@ -256,6 +256,23 @@ export const Table = styled("table")({
   "& tbody tr:hover": { background: "var(--primary-tint)" },
   "& tbody tr:focus-visible": { outline: "2px solid var(--primary)", outlineOffset: -2 },
   "& .num": { textAlign: "right", fontVariantNumeric: "tabular-nums" },
+  "& .actions": { width: 44, textAlign: "right", paddingRight: 4 },
+  "& .row-delete": {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    border: "1px solid transparent",
+    background: "transparent",
+    color: "var(--muted)",
+    display: "inline-grid",
+    placeItems: "center",
+    cursor: "pointer",
+  },
+  "& .row-delete:hover, & .row-delete:focus-visible": {
+    color: "var(--error-ink)",
+    background: "var(--error-tint)",
+    borderColor: "var(--error-soft)",
+  },
   [media.laptop]: { "& .hide-laptop": { display: "none" } },
   [media.tablet]: { display: "none" },
 });
