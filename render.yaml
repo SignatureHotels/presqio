@@ -2,7 +2,7 @@ services:
   - type: web
     name: presqio-backend
     runtime: docker
-    # SMTP needs a paid instance; the Resend HTTPS API also works on Render Free.
+    # SMTP needs a paid instance; the Gmail API and Resend (both HTTPS) also work on Render Free.
     plan: starter
     dockerfilePath: ./apps/backend/Dockerfile
     dockerContext: .
@@ -19,4 +19,13 @@ services:
       - key: UI_ORIGIN
         sync: false
       - key: APP_URL
+        sync: false
+      # Email through the Gmail API (no domain needed). See apps/backend/.env.example.
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
         sync: false

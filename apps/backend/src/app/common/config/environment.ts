@@ -25,6 +25,14 @@ const schema = z
     JWT_ACCESS_SECRET: optional(z.string().min(32)),
     ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).default(900),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).default(30),
+    /**
+     * Gmail API (HTTPS): sends from a Gmail account without a domain of your own, and works on Render
+     * Free. Preferred over Resend and SMTP when all four are set.
+     */
+    GMAIL_USER: optional(z.email()),
+    GMAIL_CLIENT_ID: optional(z.string().trim().min(1)),
+    GMAIL_CLIENT_SECRET: optional(z.string().trim().min(1)),
+    GMAIL_REFRESH_TOKEN: optional(z.string().trim().min(1)),
     /** HTTPS mail transport, preferred over SMTP when configured (works on Render Free). */
     RESEND_API_KEY: optional(z.string().trim().min(1)),
     SMTP_HOST: optional(z.string()),
@@ -57,6 +65,13 @@ const schema = z
       return b2.every(Boolean) || !b2.some(Boolean);
     },
     { path: ["B2_KEY_ID"], message: "Set all of B2_ENDPOINT, B2_REGION, B2_BUCKET, B2_KEY_ID and B2_APPLICATION_KEY, or none" },
+  )
+  .refine(
+    (env) => {
+      const gmail = [env.GMAIL_USER, env.GMAIL_CLIENT_ID, env.GMAIL_CLIENT_SECRET, env.GMAIL_REFRESH_TOKEN];
+      return gmail.every(Boolean) || !gmail.some(Boolean);
+    },
+    { path: ["GMAIL_REFRESH_TOKEN"], message: "Set all of GMAIL_USER, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN, or none" },
   )
   .refine((env) => !env.RESEND_API_KEY || Boolean(env.MAIL_FROM?.trim()), {
     path: ["MAIL_FROM"],
