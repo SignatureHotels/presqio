@@ -87,6 +87,15 @@ export class AuthService {
         verifyUrl: this.mail.link("/verify-email", token),
       }),
     );
+    this.mail.notifyAdmin(
+      mailTemplates.newSignup({
+        name: dto.fullName,
+        email,
+        organizationName: dto.organizationName,
+        signedUpAt: new Date(),
+        consoleUrl: this.mail.link("/owner"),
+      }),
+    );
     return this.issueSession(userId, client);
   }
 

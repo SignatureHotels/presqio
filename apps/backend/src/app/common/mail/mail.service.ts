@@ -162,6 +162,12 @@ export class MailService implements OnModuleInit {
     );
   }
 
+  /** Tells the Presqio team about an event (e.g. a new sign-up); does nothing if no address is set. */
+  notifyAdmin(mail: RenderedMail) {
+    const to = this.config.get<string>("ADMIN_NOTIFY_EMAIL");
+    for (const address of to?.split(",").map((a) => a.trim()).filter(Boolean) ?? []) this.queue(address, mail);
+  }
+
   link(path: string, token?: string) {
     const url = new URL(path, this.config.getOrThrow<string>("APP_URL"));
     if (token) url.searchParams.set("token", token);

@@ -33,6 +33,8 @@ const schema = z
     GMAIL_CLIENT_ID: optional(z.string().trim().min(1)),
     GMAIL_CLIENT_SECRET: optional(z.string().trim().min(1)),
     GMAIL_REFRESH_TOKEN: optional(z.string().trim().min(1)),
+    /** Where new sign-ups are reported; defaults to GMAIL_USER. Comma-separate several addresses. */
+    ADMIN_NOTIFY_EMAIL: optional(z.string().trim().min(3)),
     /** HTTPS mail transport, preferred over SMTP when configured (works on Render Free). */
     RESEND_API_KEY: optional(z.string().trim().min(1)),
     SMTP_HOST: optional(z.string()),
@@ -51,6 +53,7 @@ const schema = z
   .transform((env) => ({
     ...env,
     APP_URL: env.APP_URL ?? env.UI_ORIGIN,
+    ADMIN_NOTIFY_EMAIL: env.ADMIN_NOTIFY_EMAIL ?? env.GMAIL_USER,
     JWT_SECRET: env.JWT_SECRET ?? env.JWT_ACCESS_SECRET ?? DEV_JWT_SECRET,
     // Gmail shows app passwords in groups of four; the spaces are not part of it.
     SMTP_PASS: env.SMTP_PASS?.replace(/\s+/g, ""),

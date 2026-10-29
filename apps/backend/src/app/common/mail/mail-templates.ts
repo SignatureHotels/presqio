@@ -86,6 +86,23 @@ export const mailTemplates = {
       footnote: "This link expires in 24 hours. If you didn't create a Presqio account, you can ignore this email.",
     }),
 
+  /** To the Presqio team (ADMIN_NOTIFY_EMAIL) when a business signs up. */
+  newSignup: (input: { name: string; email: string; organizationName: string; signedUpAt: Date; consoleUrl: string }) =>
+    layout({
+      subject: `New sign-up: ${input.organizationName}`,
+      preheader: `${input.name} just created a Presqio workspace.`,
+      heading: "A new business signed up",
+      paragraphs: [
+        `Business: ${input.organizationName}`,
+        `Owner: ${input.name}`,
+        `Email: ${input.email}`,
+        `Signed up: ${input.signedUpAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} IST`,
+        "They are on the 14-day free trial and have been sent a verification email.",
+      ],
+      action: { label: "Open the owner console", url: input.consoleUrl },
+      footnote: "You get this because your address is set as ADMIN_NOTIFY_EMAIL (or GMAIL_USER) for Presqio.",
+    }),
+
   verifyEmail: (input: { name: string; verifyUrl: string }) =>
     layout({
       subject: "Verify your Presqio email",

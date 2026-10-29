@@ -3,6 +3,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { ConfigService } from "@nestjs/config";
 import { MailService } from "../src/app/common/mail/mail.service";
+import { mailTemplates } from "../src/app/common/mail/mail-templates";
 import { validateEnvironment } from "../src/app/common/config/environment";
 
 const originalFetch = globalThis.fetch;
@@ -97,4 +98,27 @@ test("Gmail sign-in and send failures are surfaced rather than reported as sent"
 test("Gmail settings must be complete", () => {
   assert.equal(validateEnvironment(gmailEnv).GMAIL_USER, "presqio.team@gmail.com");
   assert.throws(() => validateEnvironment({ GMAIL_USER: "presqio.team@gmail.com" }), /GMAIL_USER, GMAIL_CLIENT_ID/);
+});
+
+test("new sign-ups are reported to the admin inbox, which defaults to GMAIL_USER", async () => {
+  const sent: string[] = [];
+  globalThis.fetch = async (input, init) => {
+    if (String(input).includes("oauth2")) return Response.json({ access_token: "access-1", expires_in: 3600 });
+    const raw = decodeRaw(init?.body as string);
+    sent.push(raw);
+    return Response.json({ id: "gmail-message" });
+  };
+  const env = validateEnvironment(gmailEnv);
+  assert.equal(env.ADMIN_NOTIFY_EMAIL, "presqio.team@gmail.com");
+  const transport = new MailService(new ConfigService(env));
+  transport.notifyAdmin(mailTemplates.newSignup({
+    name: "Asha Rao", email: "asha@example.com", organizationName: "Rao Hospitality Group",
+    signedUpAt: new Date("2026-10-29T10:00:00Z"), consoleUrl: transport.link("/owner"),
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /^To: presqio\.team@gmail\.com$/m);
+  assert.match(sent[0], /^Subject: New sign-up: Rao Hospitality Group$/m);
+  assert.match(sent[0], /asha@example\.com/);
+  assert.match(sent[0], /29 Oct 2026, 3:30/i);
 });
