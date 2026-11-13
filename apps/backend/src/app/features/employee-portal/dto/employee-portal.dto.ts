@@ -59,4 +59,9 @@ export class TakeLeaveDto implements TakeLeaveRequest {
   @IsString()
   @MaxLength(200)
   reason?: string;
+
+  @ApiPropertyOptional({ description: "The leave type; required once the business has leave types" })
+  @IsOptional()
+  @IsUUID()
+  typeId?: string;
 }

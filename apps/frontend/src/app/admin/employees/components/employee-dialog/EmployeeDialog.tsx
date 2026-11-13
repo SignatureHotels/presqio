@@ -6,8 +6,10 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   Skeleton,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -58,6 +60,8 @@ export function EmployeeDialog({
     phone: employee?.phone ?? "",
     email: employee?.email ?? "",
     joinedOn: employee?.joinedOn ?? today ?? "",
+    otherBranchIds: employee?.otherBranchIds ?? ([] as string[]),
+    checkInAnywhere: employee?.checkInAnywhere ?? false,
   });
   const [profile, setProfile] = useState<PayrollProfile>(EMPTY_PROFILE);
   const newSalary = (month: string): Salary => ({
@@ -141,6 +145,7 @@ export function EmployeeDialog({
     } catch (caught) {
       return setError(caught instanceof Error ? caught.message : "Check the payroll fields.");
     }
+    const otherSites = draft.otherBranchIds.filter((id) => id !== draft.branchId);
     setBusy(true);
     setError("");
     try {
@@ -153,6 +158,8 @@ export function EmployeeDialog({
           phone: draft.phone.trim(),
           email: draft.email.trim(),
           joinedOn: draft.joinedOn && draft.joinedOn !== employee.joinedOn ? draft.joinedOn : undefined,
+          otherBranchIds: otherSites,
+          checkInAnywhere: draft.checkInAnywhere,
           payroll,
         });
         notify(`${draft.fullName.trim()} updated.`);
@@ -166,6 +173,8 @@ export function EmployeeDialog({
           phone: draft.phone.trim() || undefined,
           email: draft.email.trim() || undefined,
           joinedOn: draft.joinedOn || undefined,
+          ...(otherSites.length && { otherBranchIds: otherSites }),
+          ...(draft.checkInAnywhere && { checkInAnywhere: true }),
           payroll,
         });
         notify(`${created.name} added as ${created.code}.`);
@@ -255,6 +264,50 @@ export function EmployeeDialog({
               ))}
             </TextField>
           </div>
+          {(branches.length > 1 || draft.otherBranchIds.length > 0) && (
+            <TextField
+              select
+              label="Also checks in at"
+              value={draft.otherBranchIds.filter((id) => id !== draft.branchId)}
+              onChange={(event) => {
+                const value = event.target.value as unknown as string[] | string;
+                setDraft((d) => ({ ...d, otherBranchIds: typeof value === "string" ? value.split(",") : value }));
+              }}
+              slotProps={{
+                select: {
+                  multiple: true,
+                  renderValue: (ids) =>
+                    (ids as string[]).map((id) => branches.find((b) => b.id === id)?.name ?? "Removed branch").join(", "),
+                },
+              }}
+              helperText="Other branches or sites this person works at. Check-in works at any of them; check-out at the one they checked in at."
+            >
+              {branches
+                .filter((branch) => branch.id !== draft.branchId)
+                .map((branch) => (
+                  <MenuItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </MenuItem>
+                ))}
+            </TextField>
+          )}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={draft.checkInAnywhere}
+                onChange={(event) => setDraft((d) => ({ ...d, checkInAnywhere: event.target.checked }))}
+              />
+            }
+            label={
+              <span>
+                Can check in from anywhere
+                <Typography component="span" variant="body2" color="text.secondary" display="block">
+                  For field staff, drivers, sales and home visits. The selfie and location are still recorded, and
+                  the register marks these days off-site.
+                </Typography>
+              </span>
+            }
+          />
           <div className="form-columns">
             <TextField type="date" label="Date of joining" value={draft.joinedOn} onChange={set("joinedOn")} slotProps={date} />
             {canPayroll && editing ? (

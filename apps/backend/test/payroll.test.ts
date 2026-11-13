@@ -150,3 +150,50 @@ test("a custom date range pays the employed days inside it", () => {
   assert.equal(s.daysInMonth, 31);
   assert.deepEqual([s.periodStart, s.periodEnd], ["2026-10-15", "2026-10-25"]);
 });
+
+// ── holidays and leave types ─────────────────────────────────────────────────
+// 5–7 Jan 2026 (Mon–Wed) away; Mon–Sat shift; today is the 12th.
+const away = (overrides: Partial<CalculationInput>) => calculatePayroll(input({
+  today: "2026-01-12",
+  sessions: input().sessions.filter((x) => !["2026-01-05", "2026-01-06", "2026-01-07"].includes(x.date)),
+  assignments: [{ from: "2025-01-01", to: null, workingDays: [1, 2, 3, 4, 5, 6] }],
+  ...overrides,
+}));
+
+test("a holiday is not a missing day and needs no decision", () => {
+  const s = away({ holidays: ["2026-01-05"], paidLeaves: ["2026-01-06", "2026-01-07"] });
+  assert.deepEqual(s.attendance.missingDates, []);
+  assert.deepEqual(s.attendance.holidayDates, ["2026-01-05"]);
+  assert.equal(s.suggestedLopHalfDays, 0);
+  assert.ok(isClean(s), "holidays and paid leave alone need no review");
+});
+
+test("paid leave is paid: not missing, no loss of pay, nothing to acknowledge", () => {
+  const s = away({ paidLeaves: ["2026-01-05", "2026-01-06", "2026-01-07"] });
+  assert.deepEqual(s.attendance.missingDates, []);
+  assert.deepEqual(s.attendance.paidLeaveDates, ["2026-01-05", "2026-01-06", "2026-01-07"]);
+  assert.deepEqual(s.attendance.leaveDates, []);
+  assert.equal(s.suggestedLopHalfDays, 0);
+  assert.equal(s.netPayable, 19_700_000);
+  assert.ok(isClean(s));
+  assert.deepEqual(itemIssues(s, s, review({}), true), []);
+});
+
+test("unpaid leave is suggested as loss of pay and needs a decision", () => {
+  const s = away({ paidLeaves: ["2026-01-05"], unpaidLeaves: ["2026-01-06", "2026-01-07"] });
+  assert.deepEqual(s.attendance.missingDates, []);
+  assert.deepEqual(s.attendance.unpaidLeaveDates, ["2026-01-06", "2026-01-07"]);
+  assert.equal(s.suggestedLopHalfDays, 4); // 2 days
+  assert.equal(s.lopDays, 0, "a suggestion is never applied on its own");
+  assert.equal(isClean(s), false);
+  assert.match(itemIssues(s, s, review({}), true).join(), /exceptions are not acknowledged/);
+  assert.deepEqual(itemIssues(s, s, review({ acceptAttendanceExceptions: true }), true), []);
+});
+
+test("missing days and unpaid leave add up in the suggestion; untyped leave still needs judgement", () => {
+  const s = away({ unpaidLeaves: ["2026-01-06"], leaves: ["2026-01-07"] });
+  assert.deepEqual(s.attendance.missingDates, ["2026-01-05"]);
+  assert.deepEqual(s.attendance.leaveDates, ["2026-01-07"]);
+  assert.equal(s.suggestedLopHalfDays, 4); // missing 5th + unpaid 6th; untyped 7th is the admin's call
+  assert.equal(isClean(s), false);
+});

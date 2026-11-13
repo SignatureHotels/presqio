@@ -28,6 +28,7 @@ const EMPLOYEE_INCLUDE = {
     orderBy: { effective_from: "desc" },
     take: 1,
   },
+  employee_sites_employee_rows: { select: { branch_id: true }, orderBy: { created_at: "asc" } },
 } satisfies Prisma.employeesInclude;
 type EmployeeRow = Prisma.employeesGetPayload<{ include: typeof EMPLOYEE_INCLUDE }>;
 
@@ -95,11 +96,13 @@ export class EmployeesService {
             email: dto.email?.toLowerCase(),
             job_title: dto.jobTitle,
             joined_on: dto.joinedOn ? dateOnly(dto.joinedOn) : dateOnly(today),
+            check_in_anywhere: dto.checkInAnywhere ?? false,
           },
         });
         await tx.employee_branch_assignments.create({
           data: { business_id: businessId, employee_id: employee.id, branch_id: dto.branchId },
         });
+        await this.setSites(tx, businessId, employee.id, dto.branchId, dto.otherBranchIds ?? []);
         if (shift)
           await tx.shift_assignments.create({
             data: {
@@ -158,6 +161,7 @@ export class EmployeesService {
           job_title: dto.jobTitle === undefined ? undefined : dto.jobTitle || null,
           status: dto.accountStatus,
           joined_on: dto.joinedOn ? dateOnly(dto.joinedOn) : undefined,
+          check_in_anywhere: dto.checkInAnywhere,
         },
       });
       if (dto.payroll) {
@@ -177,6 +181,10 @@ export class EmployeesService {
           data: { business_id: businessId, employee_id: employeeId, branch_id: dto.branchId },
         });
       }
+      const homeBranch = dto.branchId ?? currentBranch?.branch_id;
+      if (dto.otherBranchIds !== undefined || (dto.branchId && homeBranch))
+        await this.setSites(tx, businessId, employeeId, homeBranch ?? "",
+          dto.otherBranchIds ?? before.employee_sites_employee_rows.map((s) => s.branch_id));
       const currentShift = before.shift_assignments_employee_id_rows[0];
       if (dto.shiftId !== undefined && dto.shiftId !== (currentShift?.shift_id ?? null)) {
         const shift = dto.shiftId ? await this.findShift(tx, businessId, dto.shiftId) : null;
@@ -260,6 +268,19 @@ export class EmployeesService {
     return business.timezone;
   }
 
+  /** Replace the other branches an employee may check in at (never the home branch itself). */
+  private async setSites(tx: Prisma.TransactionClient, businessId: string, employeeId: string, homeBranchId: string, branchIds: string[]) {
+    const wanted = [...new Set(branchIds)].filter((id) => id !== homeBranchId);
+    for (const id of wanted) await this.assertBranch(tx, businessId, id);
+    await tx.employee_sites.deleteMany({ where: { business_id: businessId, employee_id: employeeId, branch_id: { notIn: wanted } } });
+    for (const id of wanted)
+      await tx.employee_sites.upsert({
+        where: { employee_id_branch_id: { employee_id: employeeId, branch_id: id } },
+        create: { business_id: businessId, employee_id: employeeId, branch_id: id },
+        update: {},
+      });
+  }
+
   private async assertBranch(tx: Prisma.TransactionClient, businessId: string, branchId: string) {
     const branch = await tx.branches.findFirst({
       where: { id: branchId, business_id: businessId, status: "ACTIVE" },
@@ -319,6 +340,8 @@ const toRecord = (row: EmployeeRow, snapshot: TodaySnapshot): EmployeeRecord => 
   phone: row.phone ?? "",
   email: row.email ?? "",
   joinedOn: row.joined_on?.toISOString().slice(0, 10) ?? null,
+  otherBranchIds: row.employee_sites_employee_rows.map((site) => site.branch_id),
+  checkInAnywhere: row.check_in_anywhere,
   accountStatus: row.status,
   hasLogin: Boolean(row.user_id),
   // Former employees are never shown as checked in.

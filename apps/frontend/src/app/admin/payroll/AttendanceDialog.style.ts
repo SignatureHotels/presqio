@@ -3,7 +3,7 @@ import { styled } from "@mui/material/styles";
 export const AttendanceSheet = styled("div")({
   display: "grid",
   gap: 16,
-  ".attendance-counts": { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 12 },
+  ".attendance-counts": { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 12 },
   ".attendance-counts > div": { display: "flex", flexDirection: "column", gap: 4, padding: "12px 14px", border: "1px solid var(--line-soft)", borderRadius: 10 },
   ".attendance-counts strong": { fontSize: 22, lineHeight: 1.2 },
   ".attendance-counts span": { fontWeight: 600, fontSize: 14 },

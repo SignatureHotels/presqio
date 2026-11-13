@@ -17,8 +17,7 @@ import type {
   AttendanceHistoryDay,
   EmployeeCorrection,
   EmployeeProfile,
-  LeaveDay,
-} from "@presqio/lib";
+  LeaveDay, EmployeeLeaveOptions } from "@presqio/lib";
 import { CurrentEmployee } from "../../common/auth/auth.decorators";
 import type { EmployeeContext } from "../../common/auth/auth.types";
 import { EmployeeGuard } from "../../common/auth/employee.guard";
@@ -83,6 +82,12 @@ export class EmployeePortalController {
   @Get("leave")
   leaves(@CurrentEmployee() employee: EmployeeContext): Promise<LeaveDay[]> {
     return this.portal.leaves(employee);
+  }
+
+  /** The leave types the employee can choose, their own balance this year, and upcoming holidays. */
+  @Get("leave/options")
+  leaveOptions(@CurrentEmployee() employee: EmployeeContext): Promise<EmployeeLeaveOptions> {
+    return this.portal.leaveOptions(employee);
   }
 
   @Throttle({ default: { limit: 20, ttl: 60_000 } })

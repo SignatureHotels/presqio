@@ -35,6 +35,10 @@ export interface EmployeeRecord extends EmployeeTableRow {
   shiftId: string | null;
   /** YYYY-MM-DD */
   joinedOn: string | null;
+  /** Other branches the employee may also check in at (besides the home branch). */
+  otherBranchIds: string[];
+  /** No distance limit at check-in (work from home, field staff); selfie and GPS are still kept. */
+  checkInAnywhere: boolean;
 }
 export interface CreateEmployeeRequest {
   fullName: string;
@@ -48,6 +52,8 @@ export interface CreateEmployeeRequest {
   /** YYYY-MM-DD */
   joinedOn?: string;
   payroll?: EmployeePayrollInput;
+  otherBranchIds?: string[];
+  checkInAnywhere?: boolean;
 }
 export interface UpdateEmployeeRequest {
   fullName?: string;
@@ -62,4 +68,7 @@ export interface UpdateEmployeeRequest {
   /** YYYY-MM-DD */
   joinedOn?: string;
   payroll?: EmployeePayrollInput;
+  /** Replaces the list of other branches the employee may check in at. */
+  otherBranchIds?: string[];
+  checkInAnywhere?: boolean;
 }

@@ -35,7 +35,10 @@ export function AttendanceDialog({ organizationId, businessId, snapshot, onClose
   const counts = [
     [a.presentDays, "Attended", "Days with a check-in"],
     [a.missingDates.length, "Missing", "Working days with no check-in or leave"],
-    [a.leaveDates.length, "Leave", "Days marked as leave"],
+    [(a.paidLeaveDates?.length ?? 0), "Paid leave", "Paid leave types: no loss of pay"],
+    [(a.unpaidLeaveDates?.length ?? 0), "Unpaid leave", "Suggested as loss of pay"],
+    [a.leaveDates.length, "Other leave", "Leave with no type: your decision"],
+    [(a.holidayDates?.length ?? 0), "Holidays", "Business holidays: paid"],
     [a.openSessions, "Open", "Checked in, never checked out"],
     [a.pendingCorrections, "Corrections", "Requests awaiting approval"],
   ] as const;

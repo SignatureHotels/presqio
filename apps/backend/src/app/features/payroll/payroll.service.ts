@@ -125,16 +125,18 @@ export class PayrollService {
   private async sources(tx:Tx,businessId:string,payMonth:string,period?:{from:string;to:string}) {
     const bounds = monthBounds(payMonth);
     const range = {gte:dateOnly(bounds.start),lte:dateOnly(bounds.end)};
-    const [business,company,employees,compensations,profiles,sessions,leaves,assignments,corrections] = await Promise.all([
+    const [business,company,employees,compensations,profiles,sessions,leaves,assignments,corrections,holidayRows] = await Promise.all([
       tx.businesses.findUniqueOrThrow({where:{id:businessId},select:{timezone:true}}),this.company(tx,businessId),
       tx.employees.findMany({where:{business_id:businessId},orderBy:{id:'asc'},take:1001,select:{id:true,employee_code:true,full_name:true,job_title:true,joined_on:true,created_at:true,status:true}}),
       tx.payroll_compensations.findMany({where:{business_id:businessId,effective_month:{lte:range.gte}},orderBy:[{effective_month:'desc'},{id:'asc'}]}),
       tx.employee_payroll_profiles.findMany({where:{business_id:businessId}}),
       tx.attendance_sessions.findMany({where:{business_id:businessId,work_date:range},orderBy:{id:'asc'},select:{id:true,employee_id:true,work_date:true,opened_at:true,closed_at:true,status:true}}),
-      tx.leave_days.findMany({where:{business_id:businessId,leave_date:range,cancelled_at:null},orderBy:{id:'asc'},select:{id:true,employee_id:true,leave_date:true}}),
+      tx.leave_days.findMany({where:{business_id:businessId,leave_date:range,cancelled_at:null},orderBy:{id:'asc'},select:{id:true,employee_id:true,leave_date:true,leave_type_id:true,leave_type_ref:{select:{paid:true}}}}),
       tx.shift_assignments.findMany({where:{business_id:businessId,effective_from:{lte:range.lte},OR:[{effective_to:null},{effective_to:{gte:range.gte}}]},orderBy:[{effective_from:'desc'},{id:'asc'}],include:{shift_id_ref:{select:{policy_json:true}}}}),
       tx.attendance_corrections.findMany({where:{business_id:businessId,status:'PENDING',session_id_ref:{work_date:range}},orderBy:{id:'asc'},select:{id:true,employee_id:true}}),
+      tx.calendars.findMany({where:{business_id:businessId,calendar_date:range,is_working_day:false},orderBy:{calendar_date:'asc'},select:{calendar_date:true}}),
     ]);
+    const holidays = holidayRows.map(h => date(h.calendar_date));
     if (employees.length>1000) throw new BadRequestException('This payroll version supports up to 1,000 employee records per business.');
     const today = localDate(business.timezone);
     // A month still running is paid up to today, not to its last day.
@@ -145,6 +147,11 @@ export class PayrollService {
       const c = compensations.find(c => c.employee_id===e.id);
       const employeeSessions = sessions.filter(s => s.employee_id===e.id);
       const employeeLeaves = leaves.filter(l => l.employee_id===e.id);
+      // a leave row as it was hashed before leave types existed, plus its type only when it has one,
+      // so drafts reviewed before this change don't all turn "changed after review"
+      const leaveSource = employeeLeaves.map(l => l.leave_type_id
+        ? {id:l.id,employee_id:l.employee_id,leave_date:l.leave_date,type:l.leave_type_id,paid:l.leave_type_ref?.paid ?? null}
+        : {id:l.id,employee_id:l.employee_id,leave_date:l.leave_date});
       const employeeAssignments = assignments.filter(a => a.employee_id===e.id);
       const employeeCorrections = corrections.filter(c => c.employee_id===e.id);
       const profile = toProfile(profiles.find(p => p.employee_id===e.id));
@@ -152,12 +159,16 @@ export class PayrollService {
       // Only inputs that change pay; editing names, company or bank details must not undo a review.
       const source = {period:window,employee:{joinedOn,status:e.status,lastWorkingDate:profile.lastWorkingDate},
         compensation:c ? {id:c.id,earnings:c.earnings_json,deductions:c.deductions_json}:null,
-        sessions:employeeSessions,leaves:employeeLeaves,assignments:employeeAssignments,corrections:employeeCorrections};
+        sessions:employeeSessions,leaves:leaveSource,assignments:employeeAssignments,corrections:employeeCorrections,
+        ...(holidays.length ? {holidays} : {})};
       return calculatePayroll({month:payMonth,today,company,period:window,
         employee:{id:e.id,code:e.employee_code,name:e.full_name,designation:e.job_title ?? '',joinedOn,status:e.status},
         compensation:c ? {id:c.id,earnings:c.earnings_json as unknown as PayrollLine[],deductions:c.deductions_json as unknown as PayrollLine[]}:null,profile,
         sessions:employeeSessions.map(s => ({id:s.id,date:date(s.work_date),openedAt:s.opened_at.toISOString(),closedAt:s.closed_at?.toISOString() ?? null})),
-        leaves:employeeLeaves.map(l => date(l.leave_date)),
+        leaves:employeeLeaves.filter(l => !l.leave_type_id).map(l => date(l.leave_date)),
+        paidLeaves:employeeLeaves.filter(l => l.leave_type_ref?.paid===true).map(l => date(l.leave_date)),
+        unpaidLeaves:employeeLeaves.filter(l => l.leave_type_ref?.paid===false).map(l => date(l.leave_date)),
+        holidays,
         assignments:employeeAssignments.map(a => ({from:date(a.effective_from),to:a.effective_to ? date(a.effective_to):null,workingDays:(Array.isArray(a.weekly_pattern) ? a.weekly_pattern : (a.shift_id_ref.policy_json as {workingDays?:number[]})?.workingDays ?? [1,2,3,4,5,6]) as number[]})),
         pendingCorrections:employeeCorrections.length,review,source});
     },

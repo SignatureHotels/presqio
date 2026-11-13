@@ -1,4 +1,5 @@
 import type {
+  EmployeeLeaveOptions,
   LeaveDay,
   TakeLeaveRequest,
   AttemptOutcome,
@@ -89,6 +90,7 @@ export const employeeApi = {
   requestCorrection: (body: EmployeeCorrectionRequest) =>
     call<EmployeeCorrection>("/employee/corrections", { method: "POST", body }),
   leaves: () => call<LeaveDay[]>("/employee/leave"),
+  leaveOptions: () => call<EmployeeLeaveOptions>("/employee/leave/options"),
   takeLeave: (body: TakeLeaveRequest) => call<LeaveDay>("/employee/leave", { method: "POST", body }),
   cancelLeave: (leaveId: string) => call<void>(`/employee/leave/${leaveId}`, { method: "DELETE" }),
 };

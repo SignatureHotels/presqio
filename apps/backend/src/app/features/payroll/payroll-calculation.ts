@@ -35,7 +35,12 @@ export interface CalculationInput {
   compensation: { id: string; earnings: PayrollLine[]; deductions: PayrollLine[] } | null;
   profile: PayrollProfile;
   sessions: { id:string; date:string; openedAt:string; closedAt:string|null }[];
+  /** Leave with no type (taken before leave types existed): the admin decides how it is paid. */
   leaves: string[];
+  /** Typed leave: paid leave is paid; unpaid leave is suggested as loss of pay. */
+  paidLeaves?: string[]; unpaidLeaves?: string[];
+  /** The business's holidays: not working days, so never missing. */
+  holidays?: string[];
   assignments: { from:string; to:string|null; workingDays:number[] }[];
   pendingCorrections: number; review: PayrollReview;
   /** Pay-affecting inputs only; display details (names, company, bank) must not invalidate a review. */
@@ -55,15 +60,18 @@ export function calculatePayroll(input: CalculationInput): PayrollSnapshot {
   const paidHalfDays = eligibleDays*2-input.review.lopHalfDays;
   const sessions = input.sessions.filter(s => s.date >= eligibleStart && s.date <= eligibleEnd);
   const present = new Set(sessions.map(s => s.date));
-  const leave = new Set(input.leaves.filter(d => d >= eligibleStart && d <= eligibleEnd));
+  const inPeriod = (dates: string[] | undefined) => new Set((dates ?? []).filter(d => d >= eligibleStart && d <= eligibleEnd));
+  const leave = inPeriod(input.leaves), paidLeave = inPeriod(input.paidLeaves), unpaidLeave = inPeriod(input.unpaidLeaves);
+  const holidays = inPeriod(input.holidays);
   const missingDates: string[] = [];
   for (let date = eligibleStart; date <= eligibleEnd; date = addDays(date, 1)) {
-    if (date > input.today || present.has(date) || leave.has(date)) continue;
+    if (date > input.today || present.has(date) || leave.has(date) || paidLeave.has(date) || unpaidLeave.has(date) || holidays.has(date)) continue;
     const assignment = input.assignments.find(a => a.from <= date && (!a.to || a.to >= date));
     if (!assignment || assignment.workingDays.includes(isoWeekday(date))) missingDates.push(date);
   }
-  // Missing working days are a suggestion only: holidays and paid leave still need the admin's judgement.
-  const suggestedLopHalfDays = Math.min(missingDates.length*2, eligibleDays*2);
+  // A suggestion only, never applied by itself: missing working days and unpaid leave. Holidays and paid
+  // leave are paid; leave with no type still needs the admin's judgement.
+  const suggestedLopHalfDays = Math.min((missingDates.length+unpaidLeave.size)*2, eligibleDays*2);
   const earnings = (input.compensation?.earnings ?? []).map(line => ({ ...line,
     amount: Number((BigInt(line.amount)*BigInt(paidHalfDays)+BigInt(days))/BigInt(days*2)),
   })).concat(input.review.additionalEarnings);
@@ -77,7 +85,8 @@ export function calculatePayroll(input: CalculationInput): PayrollSnapshot {
     employee: { id:input.employee.id, code:input.employee.code, name:input.employee.name, designation:input.employee.designation, joinedOn:input.employee.joinedOn },
     profile, compensationId:input.compensation?.id ?? null, daysInMonth:days, eligibleDays, paidDays:paidHalfDays/2, lopDays:input.review.lopHalfDays/2, suggestedLopHalfDays,
     attendance:{ presentDays:present.size, completedMinutes:sessions.reduce((sum,s) => sum+(s.closedAt ? Math.max(0,Math.round((Date.parse(s.closedAt)-Date.parse(s.openedAt))/60000)):0),0),
-      missingDates, leaveDates:[...leave].sort(), openSessions:sessions.filter(s => !s.closedAt).length, pendingCorrections:input.pendingCorrections },
+      missingDates, leaveDates:[...leave].sort(), openSessions:sessions.filter(s => !s.closedAt).length, pendingCorrections:input.pendingCorrections,
+      holidayDates:[...holidays].sort(), paidLeaveDates:[...paidLeave].sort(), unpaidLeaveDates:[...unpaidLeave].sort() },
     earnings, deductions, totalEarnings, totalDeductions, netPayable:totalEarnings-totalDeductions,
     blockers, sourceHash:hash(input.source),
   };
@@ -90,12 +99,13 @@ export function itemIssues(saved: PayrollSnapshot, current: PayrollSnapshot, rev
   const issues = [...current.blockers];
   if (!reviewed || !review.note.trim()) issues.push('Needs review.');
   const a = current.attendance;
-  if (reviewed && (a.openSessions || a.pendingCorrections || a.missingDates.length || a.leaveDates.length) && !review.acceptAttendanceExceptions)
+  if (reviewed && (a.openSessions || a.pendingCorrections || a.missingDates.length || a.leaveDates.length || a.unpaidLeaveDates?.length) && !review.acceptAttendanceExceptions)
     issues.push('Attendance exceptions are not acknowledged.');
   return issues;
 }
-/** True when nothing about this employee's month needs a human decision. */
+/** True when nothing about this employee's month needs a human decision. Holidays and paid leave
+ *  within the allowance don't; unpaid leave does (its loss of pay should be applied). */
 export function isClean(s: PayrollSnapshot) {
   const a = s.attendance;
-  return !s.blockers.length && !a.openSessions && !a.pendingCorrections && !a.missingDates.length && !a.leaveDates.length;
+  return !s.blockers.length && !a.openSessions && !a.pendingCorrections && !a.missingDates.length && !a.leaveDates.length && !a.unpaidLeaveDates?.length;
 }

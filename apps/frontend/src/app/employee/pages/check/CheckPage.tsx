@@ -127,10 +127,19 @@ export function CheckPage() {
     await startAttempt().catch((caught) => setError(errorMessage(caught)));
   }
 
-  const branch = profile?.branch;
-  const distance =
-    fix && branch?.radius ? distanceMetres(fix.latitude, fix.longitude, branch.latitude, branch.longitude) : null;
-  const gpsGood = fix && branch ? fix.accuracy <= branch.maxAccuracy : false;
+  // Check-out happens at the home branch's perimeter; check-in at any of the employee's sites.
+  const sites = [profile?.branch, ...(verb === "Check in" ? (profile?.otherSites ?? []) : [])].filter(
+    (b): b is NonNullable<typeof b> => Boolean(b?.radius),
+  );
+  const measured = fix
+    ? sites
+        .map((b) => ({ b, d: distanceMetres(fix.latitude, fix.longitude, b.latitude, b.longitude) }))
+        .sort((x, y) => Number(y.d <= y.b.radius) - Number(x.d <= x.b.radius) || x.d - y.d)[0]
+    : undefined;
+  const branch = measured?.b ?? profile?.branch;
+  const distance = measured ? measured.d : null;
+  const anywhere = Boolean(profile?.checkInAnywhere);
+  const gpsGood = fix ? fix.accuracy <= (branch?.radius ? branch.maxAccuracy : anywhere ? 100 : 0) : false;
   const inside = distance !== null && branch ? distance <= branch.radius : false;
 
   if (phase === "done" && outcome) {
@@ -151,8 +160,10 @@ export function CheckPage() {
                 </p>
               ) : null}
               <p>
-                {branch?.name} · {outcome.distance} m from the branch. Your selfie was saved with this
-                record.
+                {outcome.offsite
+                  ? "Recorded away from your sites, with your location."
+                  : `${outcome.branchName ?? branch?.name} · ${outcome.distance} m from the site.`}{" "}
+                Your selfie was saved with this record.
               </p>
             </>
           ) : (
@@ -223,9 +234,14 @@ export function CheckPage() {
               {!gpsGood && " · improving…"}
             </Chip>
             {distance !== null && (
-              <Chip tone={inside ? "ok" : "bad"}>
+              <Chip tone={inside || anywhere ? "ok" : "bad"}>
                 <Icon name="pin" className="tiny" />
-                {inside ? `At ${branch?.name}` : `${distance} m from ${branch?.name}`}
+                {inside ? `At ${branch?.name}` : anywhere ? "Away from your sites · allowed" : `${distance} m from ${branch?.name}`}
+              </Chip>
+            )}
+            {distance === null && anywhere && (
+              <Chip tone="ok">
+                <Icon name="pin" className="tiny" /> You can check in from here
               </Chip>
             )}
           </>

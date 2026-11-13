@@ -24,9 +24,15 @@ export interface PayrollSnapshot {
   employee: { id: string; code: string; name: string; designation: string; joinedOn: string };
   profile: PayrollProfile; compensationId: string | null;
   daysInMonth: number; eligibleDays: number; paidDays: number; lopDays: number;
-  /** Missing past working days × 2; a starting point for the reviewer, never applied automatically. */
+  /** (Missing past working days + unpaid leave) × 2; a starting point for the reviewer, never applied automatically. */
   suggestedLopHalfDays: number;
-  attendance: { presentDays: number; completedMinutes: number; missingDates: string[]; leaveDates: string[]; openSessions: number; pendingCorrections: number };
+  attendance: {
+    presentDays: number; completedMinutes: number; missingDates: string[];
+    /** Leave with no type (taken before leave types existed): the admin decides how it is paid. */
+    leaveDates: string[]; openSessions: number; pendingCorrections: number;
+    /** Holidays and typed leave; absent in payslips made before leave types existed. */
+    holidayDates?: string[]; paidLeaveDates?: string[]; unpaidLeaveDates?: string[];
+  };
   earnings: PayrollLine[]; deductions: PayrollLine[]; totalEarnings: number; totalDeductions: number; netPayable: number;
   blockers: string[]; sourceHash: string;
 }

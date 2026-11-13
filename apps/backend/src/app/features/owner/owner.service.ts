@@ -347,6 +347,7 @@ export class OwnerService {
         await tx.employee_payroll_profiles.deleteMany(b);
         await tx.payroll_settings.deleteMany(b);
         await tx.leave_days.deleteMany(b);
+        await tx.leave_types.deleteMany(b);   // after leave_days, which refer to them
         await tx.privacy_acknowledgements.deleteMany(b);
         await tx.privacy_notices.deleteMany(b);
         await tx.employee_branch_assignments.deleteMany(b);

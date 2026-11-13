@@ -93,7 +93,8 @@ export function ReviewForm({item,busy,onSave,onClose}:{item:PayrollItem;busy:boo
   const [accepted,setAccepted]=useState(item.review.acceptAttendanceExceptions);
   const [error,setError]=useState('');
   const s=item.snapshot,a=s.attendance;
-  const exceptions=a.openSessions+a.pendingCorrections+a.missingDates.length+a.leaveDates.length;
+  const exceptions=a.openSessions+a.pendingCorrections+a.missingDates.length+a.leaveDates.length+(a.unpaidLeaveDates?.length??0);
+  const paidOff=(a.holidayDates?.length??0)+(a.paidLeaveDates?.length??0);
   async function save(event:React.FormEvent) {
     event.preventDefault();setError('');
     try {
@@ -103,9 +104,10 @@ export function ReviewForm({item,busy,onSave,onClose}:{item:PayrollItem;busy:boo
   }
   return <Dialog open onClose={busy?undefined:onClose} fullWidth maxWidth="md"><form onSubmit={save}><DialogTitle>Review · {s.employee.name} · {monthLabel(s.month)}</DialogTitle><DialogContent><Stack spacing={2} sx={{pt:1}}>
     {error&&<Alert severity="error">{error}</Alert>}
-    <Alert severity="info">{s.eligibleDays} employed calendar days · {a.presentDays} days with attendance · {Math.floor(a.completedMinutes/60)}h {a.completedMinutes%60}m recorded. Missing attendance does not automatically deduct salary. Review paid leave, holidays and weekly offs before entering LOP.</Alert>
+    <Alert severity="info">{s.eligibleDays} employed calendar days · {a.presentDays} days with attendance · {Math.floor(a.completedMinutes/60)}h {a.completedMinutes%60}m recorded. Missing attendance does not automatically deduct salary. Holidays and paid leave are already paid; the suggested LOP counts missing working days and unpaid leave.</Alert>
+    {!!paidOff&&<Alert severity="success">Paid, no LOP: {a.holidayDates?.length?`holidays ${a.holidayDates.join(', ')}`:''}{a.holidayDates?.length&&a.paidLeaveDates?.length?' · ':''}{a.paidLeaveDates?.length?`paid leave ${a.paidLeaveDates.join(', ')}`:''}</Alert>}
     {s.blockers.map(message=><Alert severity="warning" key={message}>{message}</Alert>)}
-    {!!exceptions&&<Alert severity="warning"><div>{a.openSessions} open sessions · {a.pendingCorrections} pending corrections</div><div>Missing dates: {a.missingDates.join(', ')||'None'}</div><div>Recorded leave: {a.leaveDates.join(', ')||'None'}</div></Alert>}
+    {!!exceptions&&<Alert severity="warning"><div>{a.openSessions} open sessions · {a.pendingCorrections} pending corrections</div><div>Missing dates: {a.missingDates.join(', ')||'None'}</div>{!!a.unpaidLeaveDates?.length&&<div>Unpaid leave (suggested as LOP): {a.unpaidLeaveDates.join(', ')}</div>}<div>Leave with no type (your decision): {a.leaveDates.join(', ')||'None'}</div></Alert>}
     <Typography variant="body2">Current calculation: {s.paidDays} paid days · {money(s.netPayable)} net payable. Saving this review refreshes salary and attendance from the server.</Typography>
     <TextField required label="Loss-of-pay days" type="number" value={lop} onChange={e=>setLop(e.target.value)} disabled={busy} slotProps={{htmlInput:{min:0,max:s.eligibleDays,step:0.5}}}
       helperText={`Suggested: ${s.suggestedLopHalfDays/2} (missing working days). Reduce it for holidays and paid leave.`}/>

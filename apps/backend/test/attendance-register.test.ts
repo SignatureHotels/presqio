@@ -33,6 +33,12 @@ test("register adds completed work and gaps without counting an ongoing session"
 test("leave, rest days, missing records and future schedules have distinct labels", () => {
   assert.equal(registerDay({ ...base, onLeave: true, leaveReason: "Travel" }).status, "On leave");
   assert.equal(registerDay({ ...base, workingDays: [1, 2] }).status, "Rest day");
+  assert.equal(registerDay({ ...base, holidayName: "Republic Day" }).status, "Holiday");
+  assert.equal(registerDay({ ...base, holidayName: "Republic Day" }).holidayName, "Republic Day");
+  // leave wins over a holiday, and a holiday over a weekly off
+  assert.equal(registerDay({ ...base, holidayName: "Diwali", onLeave: true, leaveReason: "", leaveType: "Casual leave" }).status, "On leave");
+  assert.equal(registerDay({ ...base, onLeave: true, leaveReason: "", leaveType: "Casual leave" }).leaveType, "Casual leave");
+  assert.equal(registerDay({ ...base, holidayName: "Diwali", workingDays: [1, 2] }).status, "Holiday");
   assert.equal(registerDay({ ...base, today: "2026-10-22" }).status, "No record");
   assert.equal(registerDay({ ...base }).status, "Not checked in");
   assert.equal(registerDay({ ...base, today: "2026-10-20" }).status, "Scheduled");
@@ -64,6 +70,7 @@ test("register queries are scoped to business, selected dates, branch and pagina
     }]; } },
     leave_days: { async findMany(query: unknown) { seen.leaves = query; return []; } },
     shift_assignments: { async findMany(query: unknown) { seen.shifts = query; return []; } },
+    calendars: { async findMany(query: unknown) { seen.holidays = query; return [{ calendar_date: new Date("2026-10-22"), name: "Dussehra" }]; } },
   };
   const result = await new AttendanceRegisterService(db as unknown as DatabaseService).get("tenant-business", { from: "2026-10-21", to: "2026-10-22", page: 2, branchId: "branch", search: "Asha" });
   assert.equal(seen.employees.where.business_id, "tenant-business");
@@ -74,6 +81,10 @@ test("register queries are scoped to business, selected dates, branch and pagina
   assert.deepEqual(seen.sessions.where.employee_id.in, ["emp1"]);
   assert.equal(seen.leaves.where.business_id, "tenant-business");
   assert.equal(seen.shifts.where.business_id, "tenant-business");
+  assert.equal(seen.holidays.where.business_id, "tenant-business");
+  assert.equal(seen.holidays.where.is_working_day, false);
+  assert.equal(result.employees[0].days[1].status, "Holiday");
+  assert.equal(result.employees[0].days[1].holidayName, "Dussehra");
   assert.equal(result.employees[0].days[0].status, "Late");
   assert.equal(result.employees[0].days[0].sessions[0].checkInPhotoAttemptId, "photo-in");
   assert.equal(result.employees[0].days[0].sessions[0].corrected, true);

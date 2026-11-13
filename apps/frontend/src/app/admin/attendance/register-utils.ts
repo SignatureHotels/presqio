@@ -19,7 +19,7 @@ export function registerCsv(data: AttendanceRegisterResponse) {
     ...data.employees.flatMap((employee) => employee.days.flatMap((day) => {
       const prefix = [employee.name, employee.code, day.date, data.timezone, day.status];
       return day.sessions.length ? day.sessions.map((session) => [
-        ...prefix, session.branchName, session.shiftName, session.checkIn, session.checkOut ?? "", session.minutesWorked ?? "", session.earlyMinutes ?? "",
+        ...prefix, session.offsite ? `${session.branchName} (off-site)` : session.branchName, session.shiftName, session.checkIn, session.checkOut ?? "", session.minutesWorked ?? "", session.earlyMinutes ?? "",
         session.corrected ? "Yes" : "No", session.checkInPhotoAttemptId ? "Yes" : "No", session.checkOutPhotoAttemptId ? "Yes" : "No",
       ]) : [[...prefix, "", "", "", "", "", "", "", "", ""]];
     })),

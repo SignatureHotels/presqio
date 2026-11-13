@@ -173,12 +173,14 @@ model businesses {
 
   attendance_photos_business_rows attendance_photos[]         @relation("attendance_photos_business")
   leave_days_business_rows        leave_days[]                @relation("leave_days_business")
+  leave_types_business_rows       leave_types[]               @relation("leave_types_business")
   payroll_settings_row            payroll_settings?
   employee_payroll_profiles_rows  employee_payroll_profiles[]
   payroll_compensations_rows      payroll_compensations[]
   payroll_runs_rows               payroll_runs[]
   payroll_items_rows              payroll_items[]
   payroll_payments_rows           payroll_payments[]
+  employee_sites_business_rows    employee_sites[]            @relation("employee_sites_business")
 
   @@unique([organization_id, id])
   @@unique([organization_id, slug])
@@ -331,6 +333,8 @@ model employees {
   email                                        String?
   status                                       EmployeeStatus                @default(PENDING)
   joined_on                                    DateTime?                     @db.Date
+  /// No distance limit at check-in (work from home, field staff); selfie and GPS are still kept.
+  check_in_anywhere                            Boolean                       @default(false)
   created_at                                   DateTime                      @default(now()) @db.Timestamptz(3)
   user_id_ref                                  users?                        @relation("employees_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   business_id_ref                              businesses                    @relation("employees_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
@@ -344,11 +348,12 @@ model employees {
   attendance_corrections_employee_id_rows      attendance_corrections[]      @relation("attendance_corrections_employee_id")
   privacy_acknowledgements_employee_id_rows    privacy_acknowledgements[]    @relation("privacy_acknowledgements_employee_id")
 
-  attendance_photos_rows     attendance_photos[]        @relation("attendance_photos_employee")
-  leave_days_rows            leave_days[]               @relation("leave_days_employee")
-  payroll_compensations_rows payroll_compensations[]
-  payroll_items_rows         payroll_items[]
-  payroll_profile_row        employee_payroll_profiles?
+  attendance_photos_rows       attendance_photos[]        @relation("attendance_photos_employee")
+  leave_days_rows              leave_days[]               @relation("leave_days_employee")
+  employee_sites_employee_rows employee_sites[]           @relation("employee_sites_employee")
+  payroll_compensations_rows   payroll_compensations[]
+  payroll_items_rows           payroll_items[]
+  payroll_profile_row          employee_payroll_profiles?
 
   @@unique([business_id, employee_code])
   @@unique([business_id, user_id])
@@ -420,6 +425,7 @@ model branches {
   attendance_attempts_branch_id_rows         attendance_attempts[]          @relation("attendance_attempts_branch_id")
   attendance_sessions_branch_id_rows         attendance_sessions[]          @relation("attendance_sessions_branch_id")
   attendance_events_branch_id_rows           attendance_events[]            @relation("attendance_events_branch_id")
+  employee_sites_branch_rows                 employee_sites[]               @relation("employee_sites_branch")
 
   @@unique([business_id, code])
   @@unique([business_id, id])
@@ -577,12 +583,13 @@ model location_checks {
   accuracy_m                Float
   client_position_timestamp DateTime            @db.Timestamptz(3)
   distance_m                Float?
-  geofence_id               String              @db.Uuid
+  /// Null for a check-in from anywhere that is away from every perimeter.
+  geofence_id               String?             @db.Uuid
   result                    VerificationResult
   reason                    String?
   checked_at                DateTime            @default(now()) @db.Timestamptz(3)
   attempt_id_ref            attendance_attempts @relation("location_checks_attempt_id", fields: [business_id, attempt_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
-  geofence_id_ref           geofences           @relation("location_checks_geofence_id", fields: [business_id, geofence_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  geofence_id_ref           geofences?          @relation("location_checks_geofence_id", fields: [business_id, geofence_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
   business_id_ref           businesses          @relation("location_checks_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([business_id, id])
@@ -805,19 +812,39 @@ model attendance_photos {
 /// A day off the employee took themselves. Kept when cancelled (cancelled_at set); at most one
 /// active leave per employee per day (partial unique index leave_days_one_active_per_day).
 model leave_days {
-  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  business_id     String     @db.Uuid
-  employee_id     String     @db.Uuid
-  leave_date      DateTime   @db.Date
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String       @db.Uuid
+  employee_id     String       @db.Uuid
+  leave_date      DateTime     @db.Date
   reason          String?
-  created_at      DateTime   @default(now()) @db.Timestamptz(3)
-  cancelled_at    DateTime?  @db.Timestamptz(3)
-  employee_id_ref employees  @relation("leave_days_employee", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
-  business_id_ref businesses @relation("leave_days_business", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  created_at      DateTime     @default(now()) @db.Timestamptz(3)
+  cancelled_at    DateTime?    @db.Timestamptz(3)
+  /// Null for leave taken before leave types existed (the admin decides how payroll treats it).
+  leave_type_id   String?      @db.Uuid
+  employee_id_ref employees    @relation("leave_days_employee", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses   @relation("leave_days_business", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  leave_type_ref  leave_types? @relation("leave_days_leave_type", fields: [business_id, leave_type_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([business_id, id])
   @@index([business_id, leave_date])
   @@index([business_id, employee_id, leave_date])
+  @@index([business_id, leave_type_id, leave_date])
+}
+
+/// A kind of leave a business offers: paid or unpaid, with an optional yearly allowance per employee.
+model leave_types {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String       @db.Uuid
+  name            String
+  paid            Boolean      @default(true)
+  /// Days each employee may take per calendar year; null means no limit.
+  days_per_year   Int?
+  archived_at     DateTime?    @db.Timestamptz(3)
+  created_at      DateTime     @default(now()) @db.Timestamptz(3)
+  business_id_ref businesses   @relation("leave_types_business", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  leave_days_rows leave_days[] @relation("leave_days_leave_type")
+
+  @@unique([business_id, id])
 }
 
 /// Payslip identity and statutory details; visible to organization owners/admins only.
@@ -908,4 +935,20 @@ model payroll_payments {
   item_ref     payroll_items @relation(fields: [business_id, item_id], references: [business_id, id], onDelete: Restrict)
 
   @@unique([business_id, item_id, reference])
+}
+
+/// Another branch an employee may also check in at (a security guard's client sites, staff covering two shops).
+model employee_sites {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  employee_id     String     @db.Uuid
+  branch_id       String     @db.Uuid
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  employee_id_ref employees  @relation("employee_sites_employee", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  branch_id_ref   branches   @relation("employee_sites_branch", fields: [business_id, branch_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  business_id_ref businesses @relation("employee_sites_business", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([business_id, id])
+  @@unique([employee_id, branch_id])
+  @@index([business_id, employee_id])
 }

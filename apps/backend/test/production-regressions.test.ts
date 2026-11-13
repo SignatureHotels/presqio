@@ -12,6 +12,7 @@ import { PhotoStorageService } from "../src/app/common/storage/photo-storage.ser
 import { EmployeePortalService } from "../src/app/features/employee-portal/employee-portal.service";
 import type { DatabaseService } from "../src/app/common/database/database.service";
 import type { AuditService } from "../src/app/features/audit/audit.service";
+import type { TimeOffService } from "../src/app/features/time-off/time-off.service";
 
 for (const kind of ["admin", "employee"] as const) {
   test(`${kind} refresh preserves cookies during outages but clears expired sessions`, async () => {
@@ -43,7 +44,7 @@ test("failed duplicate photo submissions clean up only their own upload", async 
     async remove(key: string) { objects.delete(key); },
   };
   const service = new EmployeePortalService({ async $transaction() { throw new ConflictException("Please start again."); } } as unknown as DatabaseService,
-    {} as AuditService, storage as unknown as PhotoStorageService);
+    {} as AuditService, storage as unknown as PhotoStorageService, {} as TimeOffService);
   const ctx = { userId: "user", employeeId: "employee", businessId: "business", organizationId: "org" };
   const body = { latitude: 12, longitude: 77, accuracy: 10, capturedAt: new Date().toISOString(), photo: "data:image/jpeg;base64,/9j/" };
   await Promise.all([assert.rejects(service.submitAttempt(ctx, "attempt", body)), assert.rejects(service.submitAttempt(ctx, "attempt", body))]);

@@ -116,7 +116,7 @@ export default function PayrollPage() {
   // The running month and custom date ranges are views: no reviews, approvals, finalizing or payments.
   const live=!custom&&shown?.status==='DRAFT'&&shown.month===currentMonth;
   const readOnly=live||custom;
-  const isClean=(item:PayrollItem)=>{const a=item.snapshot.attendance;return !item.reviewed&&item.issues.length===1&&item.issues[0]==='Needs review.'&&!a.openSessions&&!a.pendingCorrections&&!a.missingDates.length&&!a.leaveDates.length;};
+  const isClean=(item:PayrollItem)=>{const a=item.snapshot.attendance;return !item.reviewed&&item.issues.length===1&&item.issues[0]==='Needs review.'&&!a.openSessions&&!a.pendingCorrections&&!a.missingDates.length&&!a.leaveDates.length&&!a.unpaidLeaveDates?.length;};
   const cleanCount=shown?.status==='DRAFT'?shown.items.filter(isClean).length:0;
   const pending=shown?.status==='DRAFT'?shown.items.filter(i=>i.issues.length).length:0;
   const ready=Boolean(shown&&!pending&&!shown.missingEmployees.length);

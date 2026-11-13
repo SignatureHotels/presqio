@@ -10,11 +10,12 @@ const EmployeesPage = lazyPage(() => import("@/app/admin/employees"), "Employees
 const AttendancePage = lazyPage(() => import("@/app/admin/attendance"), "AttendancePage");
 const BranchesPage = lazyPage(() => import("@/app/admin/branches"), "BranchesPage");
 const ShiftsPage = lazyPage(() => import("@/app/admin/shifts"), "ShiftsPage");
+const TimeOffPage = lazyPage(() => import("@/app/admin/time-off"), "TimeOffPage");
 const ApprovalsPage = lazyPage(() => import("@/app/admin/approvals"), "ApprovalsPage");
 const ReportsPage = lazyPage(() => import("@/app/admin/reports"), "ReportsPage");
 const SettingsPage = lazyPage(() => import("@/app/admin/settings"), "SettingsPage");
 const PayrollPage = lazyPage(() => import("@/app/admin/payroll/PayrollPage"), "default");
-const PAGES = [OverviewPage, EmployeesPage, AttendancePage, BranchesPage, ShiftsPage, ApprovalsPage, ReportsPage, SettingsPage, PayrollPage];
+const PAGES = [OverviewPage, EmployeesPage, AttendancePage, BranchesPage, ShiftsPage, TimeOffPage, ApprovalsPage, ReportsPage, SettingsPage, PayrollPage];
 export function AdminRoutes({
   onView,
 }: {
@@ -40,6 +41,7 @@ export function AdminRoutes({
       />
       <Route path="branches" element={<BranchesPage />} />
       <Route path="shifts" element={<ShiftsPage />} />
+      <Route path="time-off" element={<TimeOffPage />} />
       <Route path="corrections" element={<ApprovalsPage />} />
       <Route
         path="approvals"

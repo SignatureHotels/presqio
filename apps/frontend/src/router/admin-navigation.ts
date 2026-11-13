@@ -35,6 +35,13 @@ export const adminNavigation = [
     description: "Plan working hours and clear attendance rules.",
   },
   {
+    path: "time-off",
+    title: "Holidays & leave",
+    icon: "calendar",
+    heading: "Holidays & leave",
+    description: "Holidays, the kinds of leave employees can take, and how much each one has used.",
+  },
+  {
     path: "corrections",
     title: "Approvals",
     icon: "shield",

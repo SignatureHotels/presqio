@@ -39,6 +39,10 @@ export interface EmployeeProfile {
   organizationName: string;
   timezone: string;
   branch: EmployeeBranchInfo | null;
+  /** Other sites the employee may check in at (each with its perimeter). */
+  otherSites: EmployeeBranchInfo[];
+  /** May check in away from every site; the location is still recorded. */
+  checkInAnywhere: boolean;
   shift: EmployeeShiftInfo | null;
   today: {
     /** YYYY-MM-DD in the organization's time zone. */
@@ -90,7 +94,11 @@ export type AttemptOutcome =
       accepted: true;
       action: AttendanceAction;
       time: string;
-      distance: number;
+      /** Metres from the site's centre; null when checked in away from every site (check in from anywhere). */
+      distance: number | null;
+      /** Where the day was recorded (another of the employee's sites, or away from all of them). */
+      branchName?: string;
+      offsite?: boolean;
       /** Check-out only: minutes before the shift's end. */
       earlyMinutes: number | null;
       profile: EmployeeProfile;
@@ -119,11 +127,17 @@ export interface TakeLeaveRequest {
   /** YYYY-MM-DD, today or later. */
   date: string;
   reason?: string;
+  /** Required once the business has leave types. */
+  typeId?: string;
 }
 export interface LeaveDay {
   id: string;
   date: string;
   reason: string;
+  /** null for leave taken before leave types existed */
+  typeId: string | null;
+  typeName: string | null;
+  paid: boolean | null;
   /** Today or later, and not checked in that day. */
   cancellable: boolean;
 }

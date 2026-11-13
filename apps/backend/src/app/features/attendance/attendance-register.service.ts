@@ -20,11 +20,13 @@ export function registerDates(from: string, to: string) {
 export function registerDay(input: {
   date: string; today: string; joined: string; sessions: RegisterSession[];
   leaveReason: string | null; onLeave: boolean; workingDays?: Weekday[]; late: boolean;
+  leaveType?: string | null; holidayName?: string | null;
 }): RegisterDay {
   const sessions = input.sessions;
   const status: RegisterStatus = sessions.length ? input.late ? "Late" : "Present"
     : input.date < input.joined ? "Not employed"
     : input.onLeave ? "On leave"
+    : input.holidayName ? "Holiday"
     : input.workingDays && !input.workingDays.includes(isoWeekday(input.date) as Weekday) ? "Rest day"
     : input.date > input.today ? "Scheduled"
     : input.date === input.today ? "Not checked in" : "No record";
@@ -37,6 +39,8 @@ export function registerDay(input: {
     date: input.date, status, sessions, gapMinutes,
     completedMinutes: sessions.reduce((sum, s) => sum + (s.minutesWorked ?? 0), 0),
     leaveReason: input.onLeave ? input.leaveReason : null,
+    leaveType: input.onLeave ? input.leaveType ?? null : null,
+    holidayName: input.holidayName ?? null,
   };
 }
 
@@ -75,7 +79,7 @@ export class AttendanceRegisterService {
       this.db.employees.count({ where }),
     ]);
     const employeeIds = employees.map((e) => e.id);
-    const [sessions, leaves, assignments] = await Promise.all([
+    const [sessions, leaves, assignments, holidays] = await Promise.all([
       this.db.attendance_sessions.findMany({
         where: { business_id: businessId, employee_id: { in: employeeIds }, work_date: range, ...(query.branchId && { branch_id: query.branchId }) },
         orderBy: { opened_at: "asc" },
@@ -83,11 +87,14 @@ export class AttendanceRegisterService {
           orderBy: { occurred_at: "asc" }, select: { type: true, attempt_id: true },
         } },
       }),
-      this.db.leave_days.findMany({ where: { business_id: businessId, employee_id: { in: employeeIds }, leave_date: range, cancelled_at: null } }),
+      this.db.leave_days.findMany({ where: { business_id: businessId, employee_id: { in: employeeIds }, leave_date: range, cancelled_at: null },
+        include: { leave_type_ref: { select: { name: true } } } }),
       this.db.shift_assignments.findMany({ where: { business_id: businessId, employee_id: { in: employeeIds }, effective_from: { lte: range.lte },
         OR: [{ effective_to: null }, { effective_to: { gte: range.gte } }] },
         orderBy: { effective_from: "desc" }, include: { shift_id_ref: true } }),
+      this.db.calendars.findMany({ where: { business_id: businessId, calendar_date: range, is_working_day: false } }),
     ]);
+    const holidayOn = new Map(holidays.map((h) => [h.calendar_date.toISOString().slice(0, 10), h.name]));
     const byDay = new Map<string, typeof sessions>();
     for (const session of sessions) {
       const key = `${session.employee_id}:${session.work_date.toISOString().slice(0, 10)}`;
@@ -112,9 +119,11 @@ export class AttendanceRegisterService {
               ? Array.isArray(assignment.weekly_pattern) ? assignment.weekly_pattern as Weekday[] : policy?.workingDays ?? [1, 2, 3, 4, 5, 6]
               : undefined,
             onLeave: leaveByDay.has(key), leaveReason: leaveByDay.get(key)?.reason ?? null,
+            leaveType: leaveByDay.get(key)?.leave_type_ref?.name ?? null, holidayName: holidayOn.get(date) ?? null,
             sessions: rows.map((row) => {
               const snapshot = row.shift_snapshot as ShiftSnapshot & { name?: string };
               const events = row.attendance_events_session_id_rows;
+              const where = (row.branch_snapshot ?? {}) as { offsite?: boolean; distance?: number | null };
               return {
                 id: row.id, branchId: row.branch_id, branchName: row.branch_id_ref.name, shiftName: snapshot?.name ?? "No shift",
                 checkIn: row.opened_at.toISOString(), checkOut: row.closed_at?.toISOString() ?? null,
@@ -123,6 +132,8 @@ export class AttendanceRegisterService {
                 corrected: row.status === "CORRECTED",
                 checkInPhotoAttemptId: events.find((e) => e.type === "CHECK_IN")?.attempt_id ?? null,
                 checkOutPhotoAttemptId: [...events].reverse().find((e) => e.type === "CHECK_OUT")?.attempt_id ?? null,
+                ...(where.offsite && { offsite: true }),
+                ...(typeof where.distance === "number" && { distanceM: where.distance }),
               };
             }),
           });

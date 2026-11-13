@@ -156,7 +156,7 @@ export function AttendancePage({ onView }: { onView: (employee: Employee) => voi
                               {session.corrected && <small>Corrected · original selfies</small>}
                             </div>
                           )) : <div className="grid-punch-pair empty-punches"><span>—<small>No check-in</small></span><span>—<small>No check-out</small></span></div>}
-                          {day.sessions.length > 0 && <small>{hoursLabel(day.completedMinutes)} worked{day.sessions.some((s) => !s.checkOut) ? " + open session" : ""}</small>}
+                          {day.sessions.length > 0 && <small>{hoursLabel(day.completedMinutes)} worked{day.sessions.some((s) => !s.checkOut) ? " + open session" : ""}{day.sessions.some((s) => s.offsite) ? " · off-site" : ""}</small>}
                           <button className="day-button" onClick={() => setSelected({ employee, day })} aria-label={`${employee.name}, ${day.date}, ${day.status}. View day details`}>Day details →</button>
                         </div>
                       </td>
@@ -201,10 +201,13 @@ export function DayDetails({ employee, day, timezone, onClose }: { employee: Reg
     <DialogContent>
       <p>{employee.code} · {day.status} · {timezone}</p>
       <p><strong>{hoursLabel(day.completedMinutes)}</strong> completed{day.gapMinutes > 0 && ` · ${hoursLabel(day.gapMinutes)} between sessions`}</p>
-      {day.leaveReason && <Alert severity="info">Leave: {day.leaveReason}</Alert>}
+      {day.holidayName && <Alert severity="info">Holiday: {day.holidayName}</Alert>}
+      {day.status === "On leave" && (day.leaveType || day.leaveReason) && (
+        <Alert severity="info">{day.leaveType ?? "Leave"}{day.leaveReason ? `: ${day.leaveReason}` : ""}</Alert>
+      )}
       {!day.sessions.length && <p>No check-in or check-out sessions recorded for this day.</p>}
       {day.sessions.map((session, index) => <SessionCard key={session.id}>
-        <h3>Session {index + 1} · {session.branchName}</h3><p>{session.shiftName}{session.corrected ? " · Approved correction applied" : ""}</p>
+        <h3>Session {index + 1} · {session.branchName}{session.offsite ? ` · Off-site${session.distanceM != null ? `, ${distanceLabel(session.distanceM)} away` : ""}` : ""}</h3><p>{session.shiftName}{session.corrected ? " · Approved correction applied" : ""}</p>
         <div className="punches">
           <div className="punch"><span className="punch-label">Check-in</span><time dateTime={session.checkIn}>{format(session.checkIn)}</time>
             <SelfieThumb attemptId={session.checkInPhotoAttemptId} label={`${employee.name} · ${day.date} · session ${index + 1} check-in selfie`} size={84} />
@@ -216,10 +219,15 @@ export function DayDetails({ employee, day, timezone, onClose }: { employee: Reg
           </div>
         </div>
         <p>{session.minutesWorked === null ? "Ongoing session; excluded from completed hours" : `${hoursLabel(session.minutesWorked)} worked`}{session.earlyMinutes ? ` · Left ${session.earlyMinutes} min early` : ""}</p>
+        {session.offsite && <p className="muted sm">Checked in away from every site (this employee may check in from anywhere). The location and selfie are kept.</p>}
         {session.corrected && <p>Times include the approved correction. Selfies are from the original recorded punches.</p>}
       </SessionCard>)}
       {day.gapMinutes > 0 && <p className="muted sm">Time between sessions is shown for reference. Approved breaks are not tracked separately.</p>}
     </DialogContent>
     <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
   </Dialog>;
+}
+
+function distanceLabel(metres: number) {
+  return metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${Math.round(metres)} m`;
 }

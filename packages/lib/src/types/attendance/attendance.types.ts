@@ -48,7 +48,7 @@ export interface OverviewResponse {
 }
 
 /** Attendance register: employee rows and calendar-date columns. */
-export type RegisterStatus = "Present" | "Late" | "On leave" | "Rest day" | "No record" | "Not checked in" | "Scheduled" | "Not employed";
+export type RegisterStatus = "Present" | "Late" | "On leave" | "Holiday" | "Rest day" | "No record" | "Not checked in" | "Scheduled" | "Not employed";
 export interface RegisterSession {
   id: string;
   branchId: string;
@@ -61,6 +61,10 @@ export interface RegisterSession {
   corrected: boolean;
   checkInPhotoAttemptId: string | null;
   checkOutPhotoAttemptId: string | null;
+  /** Checked in away from every perimeter (an employee allowed to check in from anywhere). */
+  offsite?: boolean;
+  /** Metres from the branch at check-in, when known. */
+  distanceM?: number | null;
 }
 export interface RegisterDay {
   date: string;
@@ -71,6 +75,10 @@ export interface RegisterDay {
   /** Time between recorded sessions. This does not establish an approved break. */
   gapMinutes: number;
   leaveReason: string | null;
+  /** The leave type's name, when the leave has one. */
+  leaveType?: string | null;
+  /** The holiday's name on a holiday. */
+  holidayName?: string | null;
 }
 export interface RegisterEmployee {
   id: string;

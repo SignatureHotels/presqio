@@ -17,6 +17,7 @@ import { BranchesModule } from "./features/branches/branches.module";
 import { EmployeesModule } from "./features/employees/employees.module";
 import { GeofencesModule } from "./features/geofences/geofences.module";
 import { ShiftsModule } from "./features/shifts/shifts.module";
+import { TimeOffModule } from "./features/time-off/time-off.module";
 import { AttendanceModule } from "./features/attendance/attendance.module";
 import { CorrectionsModule } from "./features/corrections/corrections.module";
 import { ReportsModule } from "./features/reports/reports.module";
@@ -43,6 +44,7 @@ import { OwnerModule } from "./features/owner/owner.module";
     EmployeesModule,
     GeofencesModule,
     ShiftsModule,
+    TimeOffModule,
     AttendanceModule,
     CorrectionsModule,
     ReportsModule,

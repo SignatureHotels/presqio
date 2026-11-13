@@ -31,6 +31,7 @@ export const Register = styled.section({
   '[data-status="Present"]': { color: '#067647', background: '#ecfdf3' },
   '[data-status="Late"]': { color: '#b54708', background: '#fffaeb' },
   '[data-status="On leave"]': { color: '#6941c6', background: '#f4f3ff' },
+  '[data-status="Holiday"]': { color: '#026aa2', background: '#f0f9ff' },
   '.register-footer': { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 16 },
   '.register-pager': { display: 'flex', alignItems: 'center', gap: 12 },
 });

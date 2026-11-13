@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, TextField } from "@mui/material";
-import type { LeaveDay } from "@presqio/lib";
+import { Alert, Button, MenuItem, TextField } from "@mui/material";
+import type { EmployeeLeaveOptions, LeaveDay } from "@presqio/lib";
 import { errorMessage } from "@/api/client";
 import { employeeApi } from "@/api/employee-client";
 import { MobileShell } from "../../components/mobile-shell";
@@ -15,6 +15,8 @@ export function LeavePage() {
   const { profile, reload } = useEmployeeSession();
   const today = profile?.today.date ?? "";
   const [leaves, setLeaves] = useState<LeaveDay[] | null>(null);
+  const [options, setOptions] = useState<EmployeeLeaveOptions | null>(null);
+  const [typeId, setTypeId] = useState("");
   const [date, setDate] = useState(today);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
@@ -23,7 +25,15 @@ export function LeavePage() {
 
   useEffect(() => {
     employeeApi.leaves().then(setLeaves).catch((caught) => setError(errorMessage(caught)));
+    employeeApi.leaveOptions().then(setOptions).catch(() => setOptions({ year: 0, types: [], holidays: [] }));
   }, []);
+  const types = options?.types ?? [];
+  const chosen = types.find((t) => t.id === typeId);
+  const holidayOn = options?.holidays.find((h) => h.date === date);
+  // the only type left with room: pick it for them
+  useEffect(() => {
+    if (!typeId && types.length === 1) setTypeId(types[0].id);
+  }, [types, typeId]);
 
   async function take(event: React.FormEvent) {
     event.preventDefault();
@@ -31,10 +41,11 @@ export function LeavePage() {
     setError("");
     setNotice("");
     try {
-      const leave = await employeeApi.takeLeave({ date, reason: reason.trim() || undefined });
+      const leave = await employeeApi.takeLeave({ date, reason: reason.trim() || undefined, typeId: typeId || undefined });
       setLeaves((current) => [leave, ...(current ?? [])].sort((a, b) => b.date.localeCompare(a.date)));
-      setNotice(`Leave saved for ${dayTitle(leave.date)}.`);
+      setNotice(`${leave.typeName ?? "Leave"} saved for ${dayTitle(leave.date)}.`);
       setReason("");
+      void employeeApi.leaveOptions().then(setOptions).catch(() => undefined);   // balances changed
       if (leave.date === today) void reload();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -50,6 +61,7 @@ export function LeavePage() {
       await employeeApi.cancelLeave(leave.id);
       setLeaves((current) => (current ?? []).filter((item) => item.id !== leave.id));
       setNotice(`Leave on ${dayTitle(leave.date)} cancelled.`);
+      void employeeApi.leaveOptions().then(setOptions).catch(() => undefined);
       if (leave.date === today) void reload();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -67,6 +79,17 @@ export function LeavePage() {
           <p>Pick any day. It's saved straight away and your admin can see it.</p>
           {error && <Alert severity="error">{error}</Alert>}
           {notice && <Alert severity="success">{notice}</Alert>}
+          {types.length > 0 && (
+            <TextField select label="Kind of leave" value={typeId} onChange={(e) => setTypeId(e.target.value)}
+              helperText={chosen ? (chosen.paid ? "Paid leave" : "Unpaid: this day isn't paid") : "Choose one"}>
+              {types.map((t) => (
+                <MenuItem key={t.id} value={t.id} disabled={t.remaining === 0}>
+                  {t.name} · {t.remaining === null ? "no limit" : t.remaining === 0 ? `none left in ${options?.year}` : `${t.remaining} of ${t.allowed} left`}
+                  {!t.paid && " (unpaid)"}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             type="date"
             label="Day"
@@ -81,11 +104,23 @@ export function LeavePage() {
             placeholder="e.g. Family function"
             slotProps={{ htmlInput: { maxLength: 200 } }}
           />
-          <Button type="submit" variant="contained" disabled={busy || !date || date < today}>
+          {holidayOn && <Alert severity="info">{holidayOn.name} is a holiday. No leave is needed that day.</Alert>}
+          <Button type="submit" variant="contained" disabled={busy || !date || date < today || !!holidayOn || (types.length > 0 && !chosen)}>
             {busy ? "Saving…" : "Take leave"}
           </Button>
         </LeaveForm>
       </Panel>
+
+      {types.some((t) => t.allowed !== null) && (
+        <>
+          <SectionTitle>Your leave in {options?.year}</SectionTitle>
+          <Panel>
+            {types.filter((t) => t.allowed !== null).map((t) => (
+              <p key={t.id} className="balance"><strong>{t.name}</strong> · {t.used} used, {t.remaining} of {t.allowed} left</p>
+            ))}
+          </Panel>
+        </>
+      )}
 
       <SectionTitle>Upcoming</SectionTitle>
       {leaves && upcoming.length === 0 && <Empty>No leave planned.</Empty>}
@@ -94,6 +129,30 @@ export function LeavePage() {
           <LeaveRow key={leave.id} leave={leave} today={today} onCancel={() => void cancel(leave)} />
         ))}
       </DayList>
+
+      {!!options?.holidays.length && (
+        <>
+          <SectionTitle>Holidays</SectionTitle>
+          <DayList>
+            {options.holidays.slice(0, 8).map((h) => {
+              const d = new Date(`${h.date}T00:00:00Z`);
+              return (
+                <DayRow key={h.id}>
+                  <div className="date">
+                    <strong>{d.getUTCDate()}</strong>
+                    <small>{d.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" }).toUpperCase()}</small>
+                  </div>
+                  <div className="info">
+                    <strong>{h.name}</strong>
+                    <small>{d.toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" })}</small>
+                  </div>
+                  <span className="chip">Holiday</span>
+                </DayRow>
+              );
+            })}
+          </DayList>
+        </>
+      )}
 
       {past.length > 0 && (
         <>
@@ -122,7 +181,7 @@ function LeaveRow({ leave, today, onCancel }: { leave: LeaveDay; today: string; 
           {date.toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" })}
           {leave.date === today && " · today"}
         </strong>
-        <small>{leave.reason || "Leave"}</small>
+        <small>{[leave.typeName, leave.reason].filter(Boolean).join(" · ") || "Leave"}</small>
       </div>
       {onCancel && leave.cancellable ? (
         <Button size="small" color="error" onClick={onCancel}>

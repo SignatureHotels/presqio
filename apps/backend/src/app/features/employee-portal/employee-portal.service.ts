@@ -11,6 +11,7 @@ import type {
   AttemptResponse,
   AttendanceHistoryDay,
   EmployeeCorrection,
+  EmployeeLeaveOptions,
   EmployeeProfile,
   LeaveDay,
   Weekday,
@@ -30,6 +31,7 @@ import {
   type ShiftSnapshot,
 } from "../../common/time/zoned";
 import { AuditService } from "../audit/audit.service";
+import { balanceOf, TimeOffService } from "../time-off/time-off.service";
 import type {
   CreateCorrectionDto,
   StartAttemptDto,
@@ -43,6 +45,8 @@ const ATTEMPT_TTL_MS = 3 * 60_000;
 const MAX_LOCATION_AGE_MS = 2 * 60_000;
 const MAX_CLOCK_SKEW_MS = 60_000;
 const HISTORY_DAYS = 45;
+/** GPS accuracy needed from someone checking in away from every perimeter (check in from anywhere). */
+const ANYWHERE_MAX_ACCURACY_M = 100;
 /** How far ahead leave can be taken. */
 const LEAVE_AHEAD_DAYS = 180;
 
@@ -55,6 +59,7 @@ export class EmployeePortalService {
     private readonly db: DatabaseService,
     private readonly audit: AuditService,
     private readonly storage: PhotoStorageService,
+    private readonly timeOff: TimeOffService,
   ) {}
 
   /** Everything the employee home screen needs. */
@@ -76,6 +81,12 @@ export class EmployeePortalService {
     const today = localDate(timezone);
     const branchId = employee.employee_branch_assignments_employee_id_rows[0]?.branch_id;
     const branch = branchId ? await this.branchWithPerimeter(ctx.businessId, branchId) : null;
+    const sites = await this.db.employee_sites.findMany({
+      where: { business_id: ctx.businessId, employee_id: ctx.employeeId, ...(branchId && { branch_id: { not: branchId } }) },
+      select: { branch_id: true }, orderBy: { created_at: "asc" },
+    });
+    const otherSites = (await Promise.all(sites.map((x) => this.branchWithPerimeter(ctx.businessId, x.branch_id))))
+      .filter((b): b is NonNullable<typeof b> => Boolean(b && b.radius));
     const shiftRow = employee.shift_assignments_employee_id_rows[0]?.shift_id_ref;
     const [open, todays, leaveToday] = await Promise.all([
       this.openSession(ctx.businessId, ctx.employeeId),
@@ -111,6 +122,8 @@ export class EmployeePortalService {
       organizationName: employee.business_id_ref.organization_id_ref.name,
       timezone,
       branch,
+      otherSites,
+      checkInAnywhere: employee.check_in_anywhere,
       shift: shiftRow
         ? {
             name: shiftRow.name,
@@ -237,25 +250,35 @@ export class EmployeePortalService {
         await tx.attendance_attempts.update({ where: { id: attemptId }, data: { status: "EXPIRED" } });
         throw new GoneException("That took too long. Please start again.");
       }
-      const [fence] = await tx.$queryRaw<
-        { id: string; radius_m: number; max_accuracy_m: number; distance_m: number }[]
-      >`SELECT id, radius_m, max_accuracy_m,
+      const { check_in_anywhere: anywhere } = await tx.employees.findUniqueOrThrow({
+        where: { id: ctx.employeeId },
+        select: { check_in_anywhere: true },
+      });
+      // The home branch's perimeter, plus (to check in) every other site the employee may work at.
+      // Check-out stays at the site the day was checked in at.
+      const fences = await tx.$queryRaw<
+        { id: string; branch_id: string; radius_m: number; max_accuracy_m: number; distance_m: number }[]
+      >`SELECT DISTINCT ON (branch_id) id, branch_id, radius_m, max_accuracy_m,
                ST_Distance(center, ST_SetSRID(ST_MakePoint(${dto.longitude}, ${dto.latitude}), 4326)::geography) AS distance_m
           FROM geofences
-         WHERE business_id = ${ctx.businessId}::uuid AND branch_id = ${attempt.branch_id}::uuid
-           AND active_to IS NULL
-         ORDER BY active_from DESC LIMIT 1`;
-      if (!fence)
+         WHERE business_id = ${ctx.businessId}::uuid AND active_to IS NULL
+           AND (branch_id = ${attempt.branch_id}::uuid
+             OR (${attempt.action === "CHECK_IN"} AND branch_id IN (
+               SELECT branch_id FROM employee_sites WHERE business_id = ${ctx.businessId}::uuid AND employee_id = ${ctx.employeeId}::uuid)))
+         ORDER BY branch_id, active_from DESC`;
+      const { fence, offsite } = pickPerimeter(fences, attempt.branch_id, anywhere);
+      if (!fence && !anywhere)
         return reject(tx, attemptId, "NO_PERIMETER", "Your branch has no check-in perimeter yet. Ask your admin.", null, dto.accuracy);
-      const distance = Math.round(fence.distance_m);
+      const distance = fence ? Math.round(fence.distance_m) : null;
+      const maxAccuracy = fence?.max_accuracy_m ?? ANYWHERE_MAX_ACCURACY_M;
       const age = Date.now() - capturedAt.getTime();
       const [result, reason] =
         age > MAX_LOCATION_AGE_MS || age < -MAX_CLOCK_SKEW_MS
           ? (["RETRY", "STALE_LOCATION"] as const)
-          : dto.accuracy > fence.max_accuracy_m
+          : dto.accuracy > maxAccuracy
             ? (["RETRY", "LOW_GPS_ACCURACY"] as const)
-            : distance > fence.radius_m
-              ? (["FAIL", "OUTSIDE_GEOFENCE"] as const)
+            : offsite
+              ? anywhere ? (["PASS", "OFFSITE"] as const) : (["FAIL", "OUTSIDE_GEOFENCE"] as const)
               : (["PASS", null] as const);
       await tx.location_checks.create({
         data: {
@@ -266,7 +289,7 @@ export class EmployeePortalService {
           accuracy_m: dto.accuracy,
           client_position_timestamp: capturedAt,
           distance_m: distance,
-          geofence_id: fence.id,
+          geofence_id: fence?.id ?? null,
           result,
           reason,
         },
@@ -278,7 +301,7 @@ export class EmployeePortalService {
           tx,
           attemptId,
           reason,
-          `GPS is not precise enough (±${Math.round(dto.accuracy)} m, needs ±${Math.round(fence.max_accuracy_m)} m). Move near a window or step outside and try again.`,
+          `GPS is not precise enough (±${Math.round(dto.accuracy)} m, needs ±${Math.round(maxAccuracy)} m). Move near a window or step outside and try again.`,
           distance,
           dto.accuracy,
         );
@@ -287,11 +310,20 @@ export class EmployeePortalService {
           tx,
           attemptId,
           reason,
-          `You're ${distance} m from the branch. Check-in works within ${Math.round(fence.radius_m)} m.`,
+          fences.length > 1
+            ? `You're ${distance} m from the nearest of your sites. Check-in works within ${Math.round(fence!.radius_m)} m of one.`
+            : `You're ${distance} m from the branch. Check-in works within ${Math.round(fence!.radius_m)} m.`,
           distance,
           dto.accuracy,
         );
 
+      // Checked in at another of the employee's sites: the day belongs to that site.
+      let siteName: string | undefined;
+      if (fence && fence.branch_id !== attempt.branch_id) {
+        await tx.attendance_attempts.update({ where: { id: attemptId }, data: { branch_id: fence.branch_id } });
+        attempt.branch_id = fence.branch_id;
+        siteName = (await tx.branches.findUniqueOrThrow({ where: { id: fence.branch_id }, select: { name: true } })).name;
+      }
       // Passed: consume the attempt, keep the selfie, then open or close the session.
       const now = new Date();
       await tx.attendance_attempts.update({
@@ -341,7 +373,7 @@ export class EmployeePortalService {
                     overnight: shiftAssignment.shift_id_ref.overnight,
                   }
                 : {},
-              branch_snapshot: { name: branch.name, radius: fence.radius_m, distance },
+              branch_snapshot: { name: branch.name, radius: fence?.radius_m ?? null, distance, ...(offsite && { offsite: true }) },
             },
           });
           sessionId = session.id;
@@ -406,7 +438,7 @@ export class EmployeePortalService {
           objectType: "attendance",
           objectId: sessionId,
           action: attempt.action === "CHECK_IN" ? "checked_in" : "checked_out",
-          after: { name: employee.full_name, distance, ...(earlyMinutes && { earlyMinutes }) },
+          after: { name: employee.full_name, distance, ...(offsite && { offsite: true }), ...(siteName && { site: siteName }), ...(earlyMinutes && { earlyMinutes }) },
         },
         tx,
       );
@@ -414,8 +446,10 @@ export class EmployeePortalService {
         accepted: true as const,
         action: attempt.action,
         time: localTime(business.timezone, now),
-        distance,
+        distance: offsite ? null : distance,
         earlyMinutes,
+        ...(siteName && { branchName: siteName }),
+        ...(offsite && { offsite: true }),
       };
     });
   }
@@ -528,10 +562,23 @@ export class EmployeePortalService {
           leave_date: { gte: dateOnly(addDays(today, -HISTORY_DAYS)) },
         },
         orderBy: { leave_date: "desc" },
+        include: { leave_type_ref: { select: { name: true, paid: true } } },
       }),
       this.checkedInOn(ctx, today),
     ]);
     return rows.map((row) => toLeaveDay(row, today, checkedIn));
+  }
+
+  async leaveOptions(ctx: EmployeeContext): Promise<EmployeeLeaveOptions> {
+    const timezone = await this.timezoneOf(ctx.businessId);
+    const today = localDate(timezone);
+    const year = Number(today.slice(0, 4));
+    const [types, used, holidays] = await Promise.all([
+      this.timeOff.leaveTypes(ctx.businessId, { activeOnly: true }),
+      this.timeOff.used(ctx.businessId, ctx.employeeId, year),
+      this.timeOff.holidays(ctx.businessId, today, addDays(today, 365)),
+    ]);
+    return { year, types: types.map((t) => ({ ...t, ...balanceOf(t, used.get(t.id) ?? 0) })), holidays };
   }
 
   /** Any day from today on; recorded at once, no approval needed. */
@@ -543,15 +590,34 @@ export class EmployeePortalService {
       throw new BadRequestException(`Leave can be taken up to ${LEAVE_AHEAD_DAYS} days ahead.`);
     if (dto.date === today && (await this.checkedInOn(ctx, today)))
       throw new ConflictException("You've already checked in today.");
+    const holiday = await this.timeOff.holiday(ctx.businessId, dto.date);
+    if (holiday) throw new BadRequestException(`${holiday.name} is a holiday; no leave is needed that day.`);
+    const types = await this.timeOff.leaveTypes(ctx.businessId, { activeOnly: true });
+    const type = dto.typeId ? types.find((t) => t.id === dto.typeId) : undefined;
+    if (dto.typeId && !type) throw new BadRequestException("That leave type isn't available any more. Pick another.");
+    if (!type && types.length) throw new BadRequestException("Choose the kind of leave.");
     try {
       const row = await this.db.$transaction(async (tx) => {
+        if (type && type.daysPerYear !== null) {
+          // one leave request at a time per employee, so two at once can't both fit the last day left
+          await tx.$queryRaw`SELECT 1 FROM employees WHERE id = ${ctx.employeeId}::uuid FOR UPDATE`;
+          const year = Number(dto.date.slice(0, 4));
+          const used = (await this.timeOff.used(ctx.businessId, ctx.employeeId, year, tx)).get(type.id) ?? 0;
+          if (used >= type.daysPerYear)
+            throw new BadRequestException(
+              `You've used all ${type.daysPerYear} days of ${type.name} for ${year}.` +
+                (types.some((t) => !t.paid && t.daysPerYear === null) ? " You can take unpaid leave instead." : ""),
+            );
+        }
         const created = await tx.leave_days.create({
           data: {
             business_id: ctx.businessId,
             employee_id: ctx.employeeId,
             leave_date: dateOnly(dto.date),
             reason: dto.reason || null,
+            leave_type_id: type?.id ?? null,
           },
+          include: { leave_type_ref: { select: { name: true, paid: true } } },
         });
         await this.recordLeave(tx, ctx, created.id, "leave_taken", dto.date);
         return created;
@@ -691,8 +757,24 @@ const correctionType = (requestedIn: Date | null, requestedOut: Date | null) =>
         ? "Missed check-in"
         : "Attendance correction";
 
+/**
+ * Which perimeter a check-in or check-out is judged against: the nearest one the reading is inside
+ * (home branch or another site), else the home branch's (or the nearest), and whether the reading is
+ * outside every one. Exported for tests.
+ */
+export function pickPerimeter<F extends { branch_id: string; radius_m: number; distance_m: number }>(
+  fences: F[], homeBranchId: string, anywhere: boolean,
+): { fence: F | null; offsite: boolean } {
+  const inside = fences.filter((f) => f.distance_m <= f.radius_m).sort((a, b) => a.distance_m - b.distance_m);
+  if (inside.length) return { fence: inside[0], offsite: false };
+  const nearest = [...fences].sort((a, b) => a.distance_m - b.distance_m)[0] ?? null;
+  const home = fences.find((f) => f.branch_id === homeBranchId) ?? null;
+  return { fence: (anywhere ? home ?? nearest : nearest ?? home), offsite: true };
+}
+
 function toLeaveDay(
-  row: { id: string; leave_date: Date; reason: string | null },
+  row: { id: string; leave_date: Date; reason: string | null; leave_type_id?: string | null;
+    leave_type_ref?: { name: string; paid: boolean } | null },
   today: string,
   checkedInToday: boolean,
 ): LeaveDay {
@@ -701,6 +783,9 @@ function toLeaveDay(
     id: row.id,
     date,
     reason: row.reason ?? "",
+    typeId: row.leave_type_id ?? null,
+    typeName: row.leave_type_ref?.name ?? null,
+    paid: row.leave_type_ref?.paid ?? null,
     cancellable: date > today || (date === today && !checkedInToday),
   };
 }

@@ -11,3 +11,4 @@ export type * from "./health";
 export type * from "./employee-portal";
 export type * from "./payroll";
 export type * from "./owner";
+export type * from "./time-off";

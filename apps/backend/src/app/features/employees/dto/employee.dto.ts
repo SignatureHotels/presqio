@@ -14,6 +14,9 @@ import {
   MaxLength,
   ValidateIf,
   ValidateNested,
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
 } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -59,6 +62,14 @@ export class CreateEmployeeDto implements CreateEmployeeRequest {
   @ApiPropertyOptional({ description: "Payslip details and salary; organization owners/admins only" })
   @IsOptional() @ValidateNested() @Type(() => EmployeePayrollDto)
   payroll?: EmployeePayrollDto;
+
+  @ApiPropertyOptional({ description: "Other branches the employee may also check in at", type: [String] })
+  @IsOptional() @IsArray() @ArrayMaxSize(50) @IsUUID("all", { each: true })
+  otherBranchIds?: string[];
+
+  @ApiPropertyOptional({ description: "No distance limit at check-in (work from home, field staff)" })
+  @IsOptional() @IsBoolean()
+  checkInAnywhere?: boolean;
 }
 
 export class UpdateEmployeeDto implements UpdateEmployeeRequest {
@@ -94,4 +105,12 @@ export class UpdateEmployeeDto implements UpdateEmployeeRequest {
   @ApiPropertyOptional({ description: "Payslip details and salary; organization owners/admins only" })
   @IsOptional() @ValidateNested() @Type(() => EmployeePayrollDto)
   payroll?: EmployeePayrollDto;
+
+  @ApiPropertyOptional({ description: "Other branches the employee may also check in at", type: [String] })
+  @IsOptional() @IsArray() @ArrayMaxSize(50) @IsUUID("all", { each: true })
+  otherBranchIds?: string[];
+
+  @ApiPropertyOptional({ description: "No distance limit at check-in (work from home, field staff)" })
+  @IsOptional() @IsBoolean()
+  checkInAnywhere?: boolean;
 }
