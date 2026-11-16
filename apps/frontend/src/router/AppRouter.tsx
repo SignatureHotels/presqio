@@ -15,6 +15,7 @@ const SelectOrganizationPage = lazyPage(() => import("@/app/select-organization"
 const OnboardingPage = lazyPage(() => import("@/app/onboarding"), "OnboardingPage");
 const AdminWorkspace = lazyPage(() => import("@/app/admin/AdminWorkspace"), "default");
 const EmployeePage = lazyPage(() => import("@/app/employee"), "EmployeePage");
+const KioskApp = lazyPage(() => import("@/app/kiosk/KioskApp"), "KioskApp");
 const OwnerPage = lazyPage(() => import("@/app/owner"), "OwnerPage");
 const OwnerSignInPage = lazyPage(() => import("@/app/owner"), "OwnerSignInPage");
 const NotFoundPage = lazyPage(() => import("@/app/not-found"), "NotFoundPage");
@@ -59,6 +60,8 @@ export function AppRouter() {
       />
       {/* Employee portal (mobile). Sub-pages such as check-in will live under /employee/… */}
       <Route path="/employee/*" element={<Suspense fallback={pageFallback}><EmployeePage /></Suspense>} />
+      {/* A shared check-in device at a branch entrance (paired by an admin, no user sign-in). */}
+      <Route path="/kiosk" element={<Suspense fallback={pageFallback}><KioskApp /></Suspense>} />
       {/* Old address, kept so earlier links and saved home-screen icons still work. */}
       <Route path="/home" element={<Navigate to="/employee" replace />} />
       <Route

@@ -4,6 +4,7 @@ import { Icon } from "@/components";
 import { useAdmin } from "@/hooks/use-admin";
 import { BranchCard } from "./components/branch-card";
 import { BranchDialog } from "./components/branch-dialog";
+import { KiosksPanel } from "./components/kiosks-panel";
 import { PageActions } from "./BranchesPage.style";
 
 export function BranchesPage() {
@@ -28,6 +29,7 @@ export function BranchesPage() {
           <BranchCard key={branch.id} branch={branch} onManage={setEditing} />
         ))}
       </div>
+      <KiosksPanel />
       {editing && (
         <BranchDialog
           key={editing === "new" ? "new" : editing.id}

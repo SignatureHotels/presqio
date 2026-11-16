@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   GoneException,
   Injectable,
   NotFoundException,
@@ -8,6 +9,7 @@ import {
 import { Prisma } from "@prisma/client";
 import type {
   AttemptOutcome,
+  EmployeeScheduleDay,
   AttemptResponse,
   AttendanceHistoryDay,
   EmployeeCorrection,
@@ -24,6 +26,7 @@ import { createOpaqueToken, hashToken } from "../../common/security/tokens";
 import {
   addDays,
   dateOnly,
+  isoWeekday,
   localDate,
   localTime,
   minutesEarly,
@@ -32,6 +35,7 @@ import {
 } from "../../common/time/zoned";
 import { AuditService } from "../audit/audit.service";
 import { balanceOf, TimeOffService } from "../time-off/time-off.service";
+import { dayPlan, pickShift, rosterDays, workingDaysOf } from "../roster/roster-schedule";
 import type {
   CreateCorrectionDto,
   StartAttemptDto,
@@ -87,7 +91,10 @@ export class EmployeePortalService {
     });
     const otherSites = (await Promise.all(sites.map((x) => this.branchWithPerimeter(ctx.businessId, x.branch_id))))
       .filter((b): b is NonNullable<typeof b> => Boolean(b && b.radius));
-    const shiftRow = employee.shift_assignments_employee_id_rows[0]?.shift_id_ref;
+    const usual = employee.shift_assignments_employee_id_rows[0];
+    const shiftRow = usual?.shift_id_ref;
+    const plan = dayPlan((await rosterDays(this.db, ctx.businessId, today, today, [ctx.employeeId])).get(`${ctx.employeeId}:${today}`),
+      usual ? { shift: usual.shift_id_ref, workingDays: workingDaysOf(usual) } : null, isoWeekday(today));
     const [open, todays, leaveToday] = await Promise.all([
       this.openSession(ctx.businessId, ctx.employeeId),
       this.db.attendance_sessions.findMany({
@@ -106,9 +113,13 @@ export class EmployeePortalService {
     const first = open ?? todays[0];
     const lastClosed = [...todays].reverse().find((s) => s.closed_at);
     const checkIn = first ? localTime(timezone, first.opened_at) : null;
-    const graceEnd = shiftRow
-      ? minutesOf(fromTime(shiftRow.starts_local)) + shiftRow.grace_min
-      : Number.POSITIVE_INFINITY;
+    // Late against the shift saved at check-in (the rostered one), else today's planned shift.
+    const firstShift = (first?.shift_snapshot ?? null) as ShiftSnapshot | null;
+    const planned = plan.shifts[0];
+    const graceEnd = firstShift?.start
+      ? minutesOf(firstShift.start) + (firstShift.graceMinutes ?? 0)
+      : first ? Number.POSITIVE_INFINITY
+      : planned ? minutesOf(fromTime(planned.starts_local)) + planned.grace_min : Number.POSITIVE_INFINITY;
     return {
       id: employee.id,
       name: employee.full_name,
@@ -152,6 +163,8 @@ export class EmployeePortalService {
             ? minutesEarly(timezone, today, lastClosed.closed_at, lastClosed.shift_snapshot as ShiftSnapshot)
             : null,
         onLeave: !checkIn && leaveToday > 0,
+        shifts: plan.shifts.map(shiftInfo),
+        dayOff: plan.off,
       },
     };
   }
@@ -229,6 +242,177 @@ export class EmployeePortalService {
     return { ...outcome, profile: await this.profile(ctx) };
   }
 
+  /** Judges the phone's GPS reading against the employee's perimeters and records the location check. */
+  /**
+   * A punch from a kiosk at `kiosk.branchId`: the same record as a phone check-in (attempt, location
+   * check, selfie, session, event), placed at the branch's perimeter. Checking in needs the kiosk's
+   * branch to be one of the employee's; checking out needs it to be where they checked in.
+   */
+  async kioskPunch(
+    ctx: EmployeeContext,
+    kiosk: { id: string; name: string; branchId: string; branchName: string },
+    action: "CHECK_IN" | "CHECK_OUT",
+    photoUrl: string,
+    idempotencyKey: string,
+  ): Promise<KioskOutcome> {
+    const photo = parsePhotoDataUrl(photoUrl);
+    const open = await this.openSession(ctx.businessId, ctx.employeeId);
+    if (action === "CHECK_IN" && open) throw new ConflictException("You're already checked in. Tap again to check out.");
+    if (action === "CHECK_OUT" && !open) throw new ConflictException("You haven't checked in yet.");
+    if (open && open.branch_id !== kiosk.branchId) {
+      const at = await this.db.branches.findUnique({ where: { id: open.branch_id }, select: { name: true } });
+      throw new BadRequestException(`You checked in at ${at?.name ?? "another branch"}. Check out there, or on your phone.`);
+    }
+    if (action === "CHECK_IN") {
+      const [employee, home, site] = await Promise.all([
+        this.db.employees.findUniqueOrThrow({ where: { id: ctx.employeeId }, select: { check_in_anywhere: true } }),
+        this.db.employee_branch_assignments.findFirst({ where: { business_id: ctx.businessId, employee_id: ctx.employeeId, effective_to: null }, select: { branch_id: true } }),
+        this.db.employee_sites.findFirst({ where: { business_id: ctx.businessId, employee_id: ctx.employeeId, branch_id: kiosk.branchId }, select: { id: true } }),
+      ]);
+      if (home?.branch_id !== kiosk.branchId && !site && !employee.check_in_anywhere)
+        throw new ForbiddenException(`You aren't set up to check in at ${kiosk.branchName}. Ask your admin to add it to your sites.`);
+    }
+    if (await this.db.attendance_attempts.findUnique({
+      where: { business_id_employee_id_idempotency_key: { business_id: ctx.businessId, employee_id: ctx.employeeId, idempotency_key: idempotencyKey } },
+      select: { id: true },
+    })) throw new ConflictException("That was already recorded.");
+    const attempt = await this.db.attendance_attempts.create({
+      data: {
+        business_id: ctx.businessId, employee_id: ctx.employeeId, branch_id: kiosk.branchId, action,
+        challenge_nonce_hash: hashToken(createOpaqueToken()), expires_at: new Date(Date.now() + ATTEMPT_TTL_MS), idempotency_key: idempotencyKey,
+      },
+    });
+    const now = new Date();
+    const storageKey = this.storage.enabled ? this.storage.keyFor(ctx.businessId, attempt.id, photo.contentType) : null;
+    if (storageKey) await this.storage.put(storageKey, photo.data, photo.contentType);
+    try {
+      // the kiosk places the punch itself, so no phone GPS is read
+      const outcome = await this.recordAttempt(ctx, attempt.id, { latitude: 0, longitude: 0, accuracy: 0, capturedAt: now.toISOString(), photo: photoUrl },
+        photo, now, storageKey, kiosk);
+      if (!outcome.accepted && storageKey) await this.storage.remove(storageKey);
+      return outcome;
+    } catch (error) {
+      if (storageKey) await this.storage.remove(storageKey);
+      throw error;
+    }
+  }
+
+  private async locate(
+    tx: Prisma.TransactionClient,
+    ctx: EmployeeContext,
+    attemptId: string,
+    attempt: { action: "CHECK_IN" | "CHECK_OUT"; branch_id: string },
+    dto: SubmitAttemptDto,
+    capturedAt: Date,
+  ): Promise<Located> {
+    const { check_in_anywhere: anywhere } = await tx.employees.findUniqueOrThrow({
+      where: { id: ctx.employeeId },
+      select: { check_in_anywhere: true },
+    });
+    // The home branch's perimeter, plus (to check in) every other site the employee may work at.
+    // Check-out stays at the site the day was checked in at.
+    const fences = await tx.$queryRaw<
+      { id: string; branch_id: string; radius_m: number; max_accuracy_m: number; distance_m: number }[]
+    >`SELECT DISTINCT ON (branch_id) id, branch_id, radius_m, max_accuracy_m,
+             ST_Distance(center, ST_SetSRID(ST_MakePoint(${dto.longitude}, ${dto.latitude}), 4326)::geography) AS distance_m
+        FROM geofences
+       WHERE business_id = ${ctx.businessId}::uuid AND active_to IS NULL
+         AND (branch_id = ${attempt.branch_id}::uuid
+           OR (${attempt.action === "CHECK_IN"} AND branch_id IN (
+             SELECT branch_id FROM employee_sites WHERE business_id = ${ctx.businessId}::uuid AND employee_id = ${ctx.employeeId}::uuid)))
+       ORDER BY branch_id, active_from DESC`;
+    const { fence, offsite } = pickPerimeter(fences, attempt.branch_id, anywhere);
+    if (!fence && !anywhere)
+      return { rejected: await reject(tx, attemptId, "NO_PERIMETER", "Your branch has no check-in perimeter yet. Ask your admin.", null, dto.accuracy) };
+    const distance = fence ? Math.round(fence.distance_m) : null;
+    const maxAccuracy = fence?.max_accuracy_m ?? ANYWHERE_MAX_ACCURACY_M;
+    const age = Date.now() - capturedAt.getTime();
+    const [result, reason] =
+      age > MAX_LOCATION_AGE_MS || age < -MAX_CLOCK_SKEW_MS
+        ? (["RETRY", "STALE_LOCATION"] as const)
+        : dto.accuracy > maxAccuracy
+          ? (["RETRY", "LOW_GPS_ACCURACY"] as const)
+          : offsite
+            ? anywhere ? (["PASS", "OFFSITE"] as const) : (["FAIL", "OUTSIDE_GEOFENCE"] as const)
+            : (["PASS", null] as const);
+    await tx.location_checks.create({
+      data: {
+        business_id: ctx.businessId,
+        attempt_id: attemptId,
+        reported_lat: dto.latitude,
+        reported_lon: dto.longitude,
+        accuracy_m: dto.accuracy,
+        client_position_timestamp: capturedAt,
+        distance_m: distance,
+        geofence_id: fence?.id ?? null,
+        result,
+        reason,
+      },
+    });
+    if (reason === "STALE_LOCATION")
+      return { rejected: await reject(tx, attemptId, reason, "Your location reading was out of date. Please try again.", distance, dto.accuracy) };
+    if (reason === "LOW_GPS_ACCURACY")
+      return { rejected: await reject(
+        tx,
+        attemptId,
+        reason,
+        `GPS is not precise enough (±${Math.round(dto.accuracy)} m, needs ±${Math.round(maxAccuracy)} m). Move near a window or step outside and try again.`,
+        distance,
+        dto.accuracy,
+      ) };
+    if (reason === "OUTSIDE_GEOFENCE")
+      return { rejected: await reject(
+        tx,
+        attemptId,
+        reason,
+        fences.length > 1
+          ? `You're ${distance} m from the nearest of your sites. Check-in works within ${Math.round(fence!.radius_m)} m of one.`
+          : `You're ${distance} m from the branch. Check-in works within ${Math.round(fence!.radius_m)} m.`,
+        distance,
+        dto.accuracy,
+      ) };
+
+    return { fence, offsite, distance };
+  }
+
+  /**
+   * A kiosk is fixed inside its branch, so its punches are placed at the branch's perimeter (reason
+   * KIOSK) instead of trusting a tablet's GPS. The kiosk and its selfie are kept with the record.
+   */
+  private async kioskLocate(
+    tx: Prisma.TransactionClient,
+    ctx: EmployeeContext,
+    attemptId: string,
+    branchId: string,
+    kiosk: { id: string; name: string },
+  ): Promise<Located> {
+    const [fence] = await tx.$queryRaw<
+      { id: string; branch_id: string; radius_m: number; max_accuracy_m: number; distance_m: number; latitude: number; longitude: number }[]
+    >`SELECT id, branch_id, radius_m, max_accuracy_m, 0::float8 AS distance_m,
+             ST_Y(center::geometry) AS latitude, ST_X(center::geometry) AS longitude
+        FROM geofences
+       WHERE business_id = ${ctx.businessId}::uuid AND branch_id = ${branchId}::uuid AND active_to IS NULL
+       ORDER BY active_from DESC LIMIT 1`;
+    if (!fence)
+      return { rejected: await reject(tx, attemptId, "NO_PERIMETER", "This kiosk's branch has no check-in perimeter yet. Ask your admin.", null, 0) };
+    await tx.location_checks.create({
+      data: {
+        business_id: ctx.businessId,
+        attempt_id: attemptId,
+        reported_lat: fence.latitude,
+        reported_lon: fence.longitude,
+        accuracy_m: 0,
+        client_position_timestamp: new Date(),
+        distance_m: 0,
+        geofence_id: fence.id,
+        result: "PASS",
+        reason: "KIOSK",
+      },
+    });
+    await tx.attendance_attempts.update({ where: { id: attemptId }, data: { policy_snapshot: { kioskId: kiosk.id, kiosk: kiosk.name } } });
+    return { fence, offsite: false, distance: 0 };
+  }
+
   private recordAttempt(
     ctx: EmployeeContext,
     attemptId: string,
@@ -236,6 +420,7 @@ export class EmployeePortalService {
     photo: ReturnType<typeof parsePhotoDataUrl>,
     capturedAt: Date,
     storageKey: string | null,
+    kiosk?: { id: string; name: string },
   ) {
     return this.db.$transaction(async (tx) => {
       const [attempt] = await tx.$queryRaw<
@@ -250,72 +435,11 @@ export class EmployeePortalService {
         await tx.attendance_attempts.update({ where: { id: attemptId }, data: { status: "EXPIRED" } });
         throw new GoneException("That took too long. Please start again.");
       }
-      const { check_in_anywhere: anywhere } = await tx.employees.findUniqueOrThrow({
-        where: { id: ctx.employeeId },
-        select: { check_in_anywhere: true },
-      });
-      // The home branch's perimeter, plus (to check in) every other site the employee may work at.
-      // Check-out stays at the site the day was checked in at.
-      const fences = await tx.$queryRaw<
-        { id: string; branch_id: string; radius_m: number; max_accuracy_m: number; distance_m: number }[]
-      >`SELECT DISTINCT ON (branch_id) id, branch_id, radius_m, max_accuracy_m,
-               ST_Distance(center, ST_SetSRID(ST_MakePoint(${dto.longitude}, ${dto.latitude}), 4326)::geography) AS distance_m
-          FROM geofences
-         WHERE business_id = ${ctx.businessId}::uuid AND active_to IS NULL
-           AND (branch_id = ${attempt.branch_id}::uuid
-             OR (${attempt.action === "CHECK_IN"} AND branch_id IN (
-               SELECT branch_id FROM employee_sites WHERE business_id = ${ctx.businessId}::uuid AND employee_id = ${ctx.employeeId}::uuid)))
-         ORDER BY branch_id, active_from DESC`;
-      const { fence, offsite } = pickPerimeter(fences, attempt.branch_id, anywhere);
-      if (!fence && !anywhere)
-        return reject(tx, attemptId, "NO_PERIMETER", "Your branch has no check-in perimeter yet. Ask your admin.", null, dto.accuracy);
-      const distance = fence ? Math.round(fence.distance_m) : null;
-      const maxAccuracy = fence?.max_accuracy_m ?? ANYWHERE_MAX_ACCURACY_M;
-      const age = Date.now() - capturedAt.getTime();
-      const [result, reason] =
-        age > MAX_LOCATION_AGE_MS || age < -MAX_CLOCK_SKEW_MS
-          ? (["RETRY", "STALE_LOCATION"] as const)
-          : dto.accuracy > maxAccuracy
-            ? (["RETRY", "LOW_GPS_ACCURACY"] as const)
-            : offsite
-              ? anywhere ? (["PASS", "OFFSITE"] as const) : (["FAIL", "OUTSIDE_GEOFENCE"] as const)
-              : (["PASS", null] as const);
-      await tx.location_checks.create({
-        data: {
-          business_id: ctx.businessId,
-          attempt_id: attemptId,
-          reported_lat: dto.latitude,
-          reported_lon: dto.longitude,
-          accuracy_m: dto.accuracy,
-          client_position_timestamp: capturedAt,
-          distance_m: distance,
-          geofence_id: fence?.id ?? null,
-          result,
-          reason,
-        },
-      });
-      if (reason === "STALE_LOCATION")
-        return reject(tx, attemptId, reason, "Your location reading was out of date. Please try again.", distance, dto.accuracy);
-      if (reason === "LOW_GPS_ACCURACY")
-        return reject(
-          tx,
-          attemptId,
-          reason,
-          `GPS is not precise enough (±${Math.round(dto.accuracy)} m, needs ±${Math.round(maxAccuracy)} m). Move near a window or step outside and try again.`,
-          distance,
-          dto.accuracy,
-        );
-      if (reason === "OUTSIDE_GEOFENCE")
-        return reject(
-          tx,
-          attemptId,
-          reason,
-          fences.length > 1
-            ? `You're ${distance} m from the nearest of your sites. Check-in works within ${Math.round(fence!.radius_m)} m of one.`
-            : `You're ${distance} m from the branch. Check-in works within ${Math.round(fence!.radius_m)} m.`,
-          distance,
-          dto.accuracy,
-        );
+      const located = kiosk
+        ? await this.kioskLocate(tx, ctx, attemptId, attempt.branch_id, kiosk)
+        : await this.locate(tx, ctx, attemptId, attempt, dto, capturedAt);
+      if ("rejected" in located) return located.rejected;
+      const { fence, offsite, distance } = located;
 
       // Checked in at another of the employee's sites: the day belongs to that site.
       let siteName: string | undefined;
@@ -351,6 +475,11 @@ export class EmployeePortalService {
           where: { business_id: ctx.businessId, employee_id: ctx.employeeId, effective_to: null },
           include: { shift_id_ref: true },
         });
+        // The roster decides today's shift; on a split day, the one this check-in belongs to.
+        const rostered = (await rosterDays(tx, ctx.businessId, today, today, [ctx.employeeId])).get(`${ctx.employeeId}:${today}`);
+        const shift = rostered
+          ? pickShift(rostered.shifts, minutesOf(localTime(business.timezone, now)))
+          : shiftAssignment?.shift_id_ref ?? null;
         const branch = await tx.branches.findUniqueOrThrow({
           where: { id: attempt.branch_id },
           select: { name: true },
@@ -364,16 +493,17 @@ export class EmployeePortalService {
               shift_assignment_id: shiftAssignment?.id,
               work_date: dateOnly(today),
               opened_at: now,
-              shift_snapshot: shiftAssignment
+              shift_snapshot: shift
                 ? {
-                    name: shiftAssignment.shift_id_ref.name,
-                    start: fromTime(shiftAssignment.shift_id_ref.starts_local),
-                    end: fromTime(shiftAssignment.shift_id_ref.ends_local),
-                    graceMinutes: shiftAssignment.shift_id_ref.grace_min,
-                    overnight: shiftAssignment.shift_id_ref.overnight,
+                    name: shift.name,
+                    start: fromTime(shift.starts_local),
+                    end: fromTime(shift.ends_local),
+                    graceMinutes: shift.grace_min,
+                    overnight: shift.overnight,
+                    ...(rostered && { rostered: true }),
                   }
                 : {},
-              branch_snapshot: { name: branch.name, radius: fence?.radius_m ?? null, distance, ...(offsite && { offsite: true }) },
+              branch_snapshot: { name: branch.name, radius: fence?.radius_m ?? null, distance, ...(offsite && { offsite: true }), ...(kiosk && { kiosk: kiosk.name }) },
             },
           });
           sessionId = session.id;
@@ -438,7 +568,7 @@ export class EmployeePortalService {
           objectType: "attendance",
           objectId: sessionId,
           action: attempt.action === "CHECK_IN" ? "checked_in" : "checked_out",
-          after: { name: employee.full_name, distance, ...(offsite && { offsite: true }), ...(siteName && { site: siteName }), ...(earlyMinutes && { earlyMinutes }) },
+          after: { name: employee.full_name, distance, ...(kiosk && { kiosk: kiosk.name }), ...(offsite && { offsite: true }), ...(siteName && { site: siteName }), ...(earlyMinutes && { earlyMinutes }) },
         },
         tx,
       );
@@ -567,6 +697,30 @@ export class EmployeePortalService {
       this.checkedInOn(ctx, today),
     ]);
     return rows.map((row) => toLeaveDay(row, today, checkedIn));
+  }
+
+  async schedule(ctx: Pick<EmployeeContext, "employeeId" | "businessId">, days = 14): Promise<EmployeeScheduleDay[]> {
+    const { timezone } = await this.db.businesses.findUniqueOrThrow({ where: { id: ctx.businessId }, select: { timezone: true } });
+    const from = localDate(timezone);
+    const to = addDays(from, days - 1);
+    const range = { gte: dateOnly(from), lte: dateOnly(to) };
+    const [assignments, rostered, holidays, leaves] = await Promise.all([
+      this.db.shift_assignments.findMany({
+        where: { business_id: ctx.businessId, employee_id: ctx.employeeId, effective_from: { lte: range.lte }, OR: [{ effective_to: null }, { effective_to: { gte: range.gte } }] },
+        orderBy: { effective_from: "desc" }, include: { shift_id_ref: true },
+      }),
+      rosterDays(this.db, ctx.businessId, from, to, [ctx.employeeId]),
+      this.db.calendars.findMany({ where: { business_id: ctx.businessId, is_working_day: false, calendar_date: range } }),
+      this.db.leave_days.findMany({ where: { business_id: ctx.businessId, employee_id: ctx.employeeId, cancelled_at: null, leave_date: range }, select: { leave_date: true } }),
+    ]);
+    const holidayOn = new Map(holidays.map((h) => [h.calendar_date.toISOString().slice(0, 10), h.name]));
+    const leaveOn = new Set(leaves.map((l) => l.leave_date.toISOString().slice(0, 10)));
+    return Array.from({ length: days }, (_, i) => {
+      const date = addDays(from, i);
+      const usual = assignments.find((a) => a.effective_from <= dateOnly(date) && (!a.effective_to || a.effective_to >= dateOnly(date)));
+      const plan = dayPlan(rostered.get(`${ctx.employeeId}:${date}`), usual ? { shift: usual.shift_id_ref, workingDays: workingDaysOf(usual) } : null, isoWeekday(date));
+      return { date, off: plan.off, shifts: plan.shifts.map(shiftInfo), rostered: plan.rostered, holiday: holidayOn.get(date) ?? null, onLeave: leaveOn.has(date) };
+    });
   }
 
   async leaveOptions(ctx: EmployeeContext): Promise<EmployeeLeaveOptions> {
@@ -789,3 +943,15 @@ function toLeaveDay(
     cancellable: date > today || (date === today && !checkedInToday),
   };
 }
+
+const shiftInfo = (s: { name: string; starts_local: Date; ends_local: Date; overnight: boolean }) =>
+  ({ name: s.name, start: fromTime(s.starts_local), end: fromTime(s.ends_local), overnight: s.overnight });
+
+type Located =
+  | { rejected: Extract<AttemptOutcome, { accepted: false }> }
+  | { fence: { id: string; branch_id: string; radius_m: number } | null; offsite: boolean; distance: number | null };
+
+/** A kiosk punch's result (the kiosk shows no profile). */
+export type KioskOutcome =
+  | Omit<Extract<AttemptOutcome, { accepted: true }>, "profile">
+  | Extract<AttemptOutcome, { accepted: false }>;

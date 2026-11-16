@@ -339,6 +339,7 @@ export class OwnerService {
         await tx.attendance_attempts.deleteMany(b);
         await tx.face_enrollments.deleteMany(b);
         await tx.shift_assignments.deleteMany(b);
+        await tx.roster_entries.deleteMany(b);   // before shifts and employees, which they refer to
         await tx.shifts.deleteMany(b);
         await tx.payroll_payments.deleteMany(b);
         await tx.payroll_items.deleteMany(b);
@@ -351,6 +352,8 @@ export class OwnerService {
         await tx.privacy_acknowledgements.deleteMany(b);
         await tx.privacy_notices.deleteMany(b);
         await tx.employee_branch_assignments.deleteMany(b);
+        await tx.employee_sites.deleteMany(b);   // before branches and employees
+        await tx.kiosks.deleteMany(b);   // before branches
         await tx.activation_tokens.deleteMany(b);
         await tx.business_membership_branches.deleteMany(b);
         await tx.business_memberships.deleteMany(b);

@@ -181,6 +181,8 @@ model businesses {
   payroll_items_rows              payroll_items[]
   payroll_payments_rows           payroll_payments[]
   employee_sites_business_rows    employee_sites[]            @relation("employee_sites_business")
+  roster_entries_business_rows    roster_entries[]            @relation("roster_entries_business")
+  kiosks_business_rows            kiosks[]                    @relation("kiosks_business")
 
   @@unique([organization_id, id])
   @@unique([organization_id, slug])
@@ -351,6 +353,7 @@ model employees {
   attendance_photos_rows       attendance_photos[]        @relation("attendance_photos_employee")
   leave_days_rows              leave_days[]               @relation("leave_days_employee")
   employee_sites_employee_rows employee_sites[]           @relation("employee_sites_employee")
+  roster_entries_employee_rows roster_entries[]           @relation("roster_entries_employee")
   payroll_compensations_rows   payroll_compensations[]
   payroll_items_rows           payroll_items[]
   payroll_profile_row          employee_payroll_profiles?
@@ -426,6 +429,7 @@ model branches {
   attendance_sessions_branch_id_rows         attendance_sessions[]          @relation("attendance_sessions_branch_id")
   attendance_events_branch_id_rows           attendance_events[]            @relation("attendance_events_branch_id")
   employee_sites_branch_rows                 employee_sites[]               @relation("employee_sites_branch")
+  kiosks_branch_rows                         kiosks[]                       @relation("kiosks_branch")
 
   @@unique([business_id, code])
   @@unique([business_id, id])
@@ -475,6 +479,7 @@ model shifts {
   policy_json                     Json                @default("{}")
   business_id_ref                 businesses          @relation("shifts_business_id", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   shift_assignments_shift_id_rows shift_assignments[] @relation("shift_assignments_shift_id")
+  roster_entries_shift_rows       roster_entries[]    @relation("roster_entries_shift")
 
   @@unique([business_id, id])
 }
@@ -959,4 +964,41 @@ model employee_sites {
   @@unique([business_id, id])
   @@unique([employee_id, branch_id])
   @@index([business_id, employee_id])
+}
+
+/// What someone works on a date, overriding their usual shift: one or more shifts (a split day), or a day off (no shift).
+/// Uniqueness is enforced by partial indexes in the migration.
+model roster_entries {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id     String     @db.Uuid
+  employee_id     String     @db.Uuid
+  work_date       DateTime   @db.Date
+  shift_id        String?    @db.Uuid
+  created_by      String     @db.Uuid
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  business_id_ref businesses @relation("roster_entries_business", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  employee_id_ref employees  @relation("roster_entries_employee", fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+  shift_id_ref    shifts?    @relation("roster_entries_shift", fields: [business_id, shift_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([business_id, work_date], map: "roster_entries_date_idx")
+}
+
+/// A shared check-in device at a branch entrance. Only hashes of its pairing code and token are kept.
+model kiosks {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id        String     @db.Uuid
+  branch_id          String     @db.Uuid
+  name               String
+  token_hash         String?    @unique
+  pairing_code_hash  String?    @unique
+  pairing_expires_at DateTime?  @db.Timestamptz(3)
+  paired_at          DateTime?  @db.Timestamptz(3)
+  last_seen_at       DateTime?  @db.Timestamptz(3)
+  revoked_at         DateTime?  @db.Timestamptz(3)
+  created_by         String     @db.Uuid
+  created_at         DateTime   @default(now()) @db.Timestamptz(3)
+  business_id_ref    businesses @relation("kiosks_business", fields: [business_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  branch_id_ref      branches   @relation("kiosks_branch", fields: [business_id, branch_id], references: [business_id, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([business_id], map: "kiosks_business_idx")
 }

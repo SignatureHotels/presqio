@@ -1,0 +1,1 @@
+export { KiosksPanel } from "./KiosksPanel";

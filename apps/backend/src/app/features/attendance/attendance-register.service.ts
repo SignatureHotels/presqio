@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import type { AttendanceRegisterResponse, RegisterDay, RegisterSession, RegisterStatus, Weekday } from "@presqio/lib";
 import { DatabaseService } from "../../common/database/database.service";
 import { addDays, dateOnly, isoWeekday, localDate, localTime, minutesEarly, minutesOf, type ShiftSnapshot } from "../../common/time/zoned";
+import { rosterDays } from "../roster/roster-schedule";
 import type { AttendanceRegisterDto } from "./dto/attendance-register.dto";
 
 const PAGE_SIZE = 25;
@@ -21,12 +22,15 @@ export function registerDay(input: {
   date: string; today: string; joined: string; sessions: RegisterSession[];
   leaveReason: string | null; onLeave: boolean; workingDays?: Weekday[]; late: boolean;
   leaveType?: string | null; holidayName?: string | null;
+  /** The roster for this date, when set: overrides the weekly working days. */
+  roster?: { off: boolean; shiftNames: string[] };
 }): RegisterDay {
   const sessions = input.sessions;
   const status: RegisterStatus = sessions.length ? input.late ? "Late" : "Present"
     : input.date < input.joined ? "Not employed"
     : input.onLeave ? "On leave"
     : input.holidayName ? "Holiday"
+    : input.roster ? input.roster.off ? "Rest day" : input.date > input.today ? "Scheduled" : input.date === input.today ? "Not checked in" : "No record"
     : input.workingDays && !input.workingDays.includes(isoWeekday(input.date) as Weekday) ? "Rest day"
     : input.date > input.today ? "Scheduled"
     : input.date === input.today ? "Not checked in" : "No record";
@@ -41,6 +45,7 @@ export function registerDay(input: {
     leaveReason: input.onLeave ? input.leaveReason : null,
     leaveType: input.onLeave ? input.leaveType ?? null : null,
     holidayName: input.holidayName ?? null,
+    ...(input.roster && { rostered: input.roster.shiftNames }),
   };
 }
 
@@ -94,6 +99,7 @@ export class AttendanceRegisterService {
         orderBy: { effective_from: "desc" }, include: { shift_id_ref: true } }),
       this.db.calendars.findMany({ where: { business_id: businessId, calendar_date: range, is_working_day: false } }),
     ]);
+    const roster = await rosterDays(this.db, businessId, query.from, query.to, employeeIds);
     const holidayOn = new Map(holidays.map((h) => [h.calendar_date.toISOString().slice(0, 10), h.name]));
     const byDay = new Map<string, typeof sessions>();
     for (const session of sessions) {
@@ -120,10 +126,11 @@ export class AttendanceRegisterService {
               : undefined,
             onLeave: leaveByDay.has(key), leaveReason: leaveByDay.get(key)?.reason ?? null,
             leaveType: leaveByDay.get(key)?.leave_type_ref?.name ?? null, holidayName: holidayOn.get(date) ?? null,
+            roster: roster.has(key) ? { off: roster.get(key)!.off, shiftNames: roster.get(key)!.shifts.map((s) => s.name) } : undefined,
             sessions: rows.map((row) => {
               const snapshot = row.shift_snapshot as ShiftSnapshot & { name?: string };
               const events = row.attendance_events_session_id_rows;
-              const where = (row.branch_snapshot ?? {}) as { offsite?: boolean; distance?: number | null };
+              const where = (row.branch_snapshot ?? {}) as { offsite?: boolean; distance?: number | null; kiosk?: string };
               return {
                 id: row.id, branchId: row.branch_id, branchName: row.branch_id_ref.name, shiftName: snapshot?.name ?? "No shift",
                 checkIn: row.opened_at.toISOString(), checkOut: row.closed_at?.toISOString() ?? null,
@@ -133,6 +140,7 @@ export class AttendanceRegisterService {
                 checkInPhotoAttemptId: events.find((e) => e.type === "CHECK_IN")?.attempt_id ?? null,
                 checkOutPhotoAttemptId: [...events].reverse().find((e) => e.type === "CHECK_OUT")?.attempt_id ?? null,
                 ...(where.offsite && { offsite: true }),
+                ...(where.kiosk && { kiosk: where.kiosk }),
                 ...(typeof where.distance === "number" && { distanceM: where.distance }),
               };
             }),

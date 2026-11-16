@@ -65,6 +65,8 @@ export interface RegisterSession {
   offsite?: boolean;
   /** Metres from the branch at check-in, when known. */
   distanceM?: number | null;
+  /** The kiosk the check-in was made on, when it was. */
+  kiosk?: string;
 }
 export interface RegisterDay {
   date: string;
@@ -79,6 +81,8 @@ export interface RegisterDay {
   leaveType?: string | null;
   /** The holiday's name on a holiday. */
   holidayName?: string | null;
+  /** Shift names set on the roster for this date (a split day has two); absent when not rostered. */
+  rostered?: string[];
 }
 export interface RegisterEmployee {
   id: string;

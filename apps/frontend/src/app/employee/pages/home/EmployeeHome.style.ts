@@ -241,3 +241,25 @@ export const SwitchRow = styled("p")({
     cursor: "pointer",
   },
 });
+
+/** The next few days of the employee's schedule. */
+export const Upcoming = styled("ul")({
+  listStyle: "none",
+  margin: 0,
+  padding: 0,
+  display: "flex",
+  flexDirection: "column",
+  "& li": {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: "9px 0",
+    borderTop: "1px solid var(--line-soft)",
+    fontSize: 14,
+  },
+  "& li:first-of-type": { borderTop: 0 },
+  "& .when": { fontWeight: 600, whiteSpace: "nowrap" },
+  "& .what": { textAlign: "right" },
+  "& .what.off": { color: "var(--muted)" },
+  "& small": { color: "var(--muted)" },
+});

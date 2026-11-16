@@ -42,6 +42,8 @@ export interface CalculationInput {
   /** The business's holidays: not working days, so never missing. */
   holidays?: string[];
   assignments: { from:string; to:string|null; workingDays:number[] }[];
+  /** Rostered dates: a roster day off isn't expected work; a rostered shift is, whatever the weekly offs say. */
+  roster?: { date:string; off:boolean }[];
   pendingCorrections: number; review: PayrollReview;
   /** Pay-affecting inputs only; display details (names, company, bank) must not invalidate a review. */
   source: unknown;
@@ -66,6 +68,8 @@ export function calculatePayroll(input: CalculationInput): PayrollSnapshot {
   const missingDates: string[] = [];
   for (let date = eligibleStart; date <= eligibleEnd; date = addDays(date, 1)) {
     if (date > input.today || present.has(date) || leave.has(date) || paidLeave.has(date) || unpaidLeave.has(date) || holidays.has(date)) continue;
+    const rostered = input.roster?.find(r => r.date === date);
+    if (rostered) { if (!rostered.off) missingDates.push(date); continue; }
     const assignment = input.assignments.find(a => a.from <= date && (!a.to || a.to >= date));
     if (!assignment || assignment.workingDays.includes(isoWeekday(date))) missingDates.push(date);
   }

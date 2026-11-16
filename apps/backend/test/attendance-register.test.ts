@@ -43,6 +43,10 @@ test("leave, rest days, missing records and future schedules have distinct label
   assert.equal(registerDay({ ...base }).status, "Not checked in");
   assert.equal(registerDay({ ...base, today: "2026-10-20" }).status, "Scheduled");
   assert.equal(registerDay({ ...base, joined: "2026-10-22" }).status, "Not employed");
+  // the roster overrides weekly offs both ways
+  assert.equal(registerDay({ ...base, workingDays: [1, 2], roster: { off: false, shiftNames: ["Dinner"] } }).status, "Not checked in");
+  assert.equal(registerDay({ ...base, roster: { off: true, shiftNames: [] } }).status, "Rest day");
+  assert.deepEqual(registerDay({ ...base, roster: { off: false, shiftNames: ["Lunch", "Dinner"] } }).rostered, ["Lunch", "Dinner"]);
   assert.equal(registerDay({ ...base, sessions: [session()], onLeave: true, late: true }).status, "Late");
 });
 
@@ -71,6 +75,7 @@ test("register queries are scoped to business, selected dates, branch and pagina
     leave_days: { async findMany(query: unknown) { seen.leaves = query; return []; } },
     shift_assignments: { async findMany(query: unknown) { seen.shifts = query; return []; } },
     calendars: { async findMany(query: unknown) { seen.holidays = query; return [{ calendar_date: new Date("2026-10-22"), name: "Dussehra" }]; } },
+    roster_entries: { async findMany(query: unknown) { seen.roster = query; return []; } },
   };
   const result = await new AttendanceRegisterService(db as unknown as DatabaseService).get("tenant-business", { from: "2026-10-21", to: "2026-10-22", page: 2, branchId: "branch", search: "Asha" });
   assert.equal(seen.employees.where.business_id, "tenant-business");
@@ -83,6 +88,7 @@ test("register queries are scoped to business, selected dates, branch and pagina
   assert.equal(seen.shifts.where.business_id, "tenant-business");
   assert.equal(seen.holidays.where.business_id, "tenant-business");
   assert.equal(seen.holidays.where.is_working_day, false);
+  assert.equal(seen.roster.where.business_id, "tenant-business");
   assert.equal(result.employees[0].days[1].status, "Holiday");
   assert.equal(result.employees[0].days[1].holidayName, "Dussehra");
   assert.equal(result.employees[0].days[0].status, "Late");

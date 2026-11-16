@@ -1,5 +1,6 @@
 import type {
   EmployeeLeaveOptions,
+  EmployeeScheduleDay,
   LeaveDay,
   TakeLeaveRequest,
   AttemptOutcome,
@@ -91,6 +92,8 @@ export const employeeApi = {
     call<EmployeeCorrection>("/employee/corrections", { method: "POST", body }),
   leaves: () => call<LeaveDay[]>("/employee/leave"),
   leaveOptions: () => call<EmployeeLeaveOptions>("/employee/leave/options"),
+  /** The next two weeks: shifts, days off, holidays and leave. */
+  schedule: () => call<EmployeeScheduleDay[]>("/employee/schedule"),
   takeLeave: (body: TakeLeaveRequest) => call<LeaveDay>("/employee/leave", { method: "POST", body }),
   cancelLeave: (leaveId: string) => call<void>(`/employee/leave/${leaveId}`, { method: "DELETE" }),
 };

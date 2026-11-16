@@ -202,12 +202,13 @@ export function DayDetails({ employee, day, timezone, onClose }: { employee: Reg
       <p>{employee.code} · {day.status} · {timezone}</p>
       <p><strong>{hoursLabel(day.completedMinutes)}</strong> completed{day.gapMinutes > 0 && ` · ${hoursLabel(day.gapMinutes)} between sessions`}</p>
       {day.holidayName && <Alert severity="info">Holiday: {day.holidayName}</Alert>}
+      {day.rostered && <p className="muted sm">Rostered: {day.rostered.length ? day.rostered.join(" + ") : "day off"}</p>}
       {day.status === "On leave" && (day.leaveType || day.leaveReason) && (
         <Alert severity="info">{day.leaveType ?? "Leave"}{day.leaveReason ? `: ${day.leaveReason}` : ""}</Alert>
       )}
       {!day.sessions.length && <p>No check-in or check-out sessions recorded for this day.</p>}
       {day.sessions.map((session, index) => <SessionCard key={session.id}>
-        <h3>Session {index + 1} · {session.branchName}{session.offsite ? ` · Off-site${session.distanceM != null ? `, ${distanceLabel(session.distanceM)} away` : ""}` : ""}</h3><p>{session.shiftName}{session.corrected ? " · Approved correction applied" : ""}</p>
+        <h3>Session {index + 1} · {session.branchName}{session.kiosk ? ` · kiosk “${session.kiosk}”` : ""}{session.offsite ? ` · Off-site${session.distanceM != null ? `, ${distanceLabel(session.distanceM)} away` : ""}` : ""}</h3><p>{session.shiftName}{session.corrected ? " · Approved correction applied" : ""}</p>
         <div className="punches">
           <div className="punch"><span className="punch-label">Check-in</span><time dateTime={session.checkIn}>{format(session.checkIn)}</time>
             <SelfieThumb attemptId={session.checkInPhotoAttemptId} label={`${employee.name} · ${day.date} · session ${index + 1} check-in selfie`} size={84} />

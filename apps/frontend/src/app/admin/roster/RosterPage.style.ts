@@ -1,0 +1,35 @@
+import { styled } from "@mui/material/styles";
+
+export const RosterRoot = styled("div")({
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
+  ".toolbar": { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 },
+  ".toolbar .spacer": { flex: 1 },
+  ".table-wrap": { overflowX: "auto", WebkitOverflowScrolling: "touch" },
+  "table.roster": {
+    borderCollapse: "separate", borderSpacing: 0, width: "100%", minWidth: 760, fontSize: 13,
+    "th, td": { borderBottom: "1px solid var(--line-soft)", padding: 4, textAlign: "left", verticalAlign: "top" },
+    "thead th": { fontWeight: 600, padding: "8px 6px", whiteSpace: "nowrap" },
+    "thead th small": { display: "block", fontWeight: 400, color: "var(--muted)", fontSize: 11 },
+    "thead th.holiday small": { color: "#026aa2" },
+    "thead th.today": { color: "var(--forest)" },
+    "th.person": { position: "sticky", left: 0, background: "var(--surface)", zIndex: 1, minWidth: 150, padding: "8px 6px" },
+    "th.person small": { display: "block", color: "var(--muted)", fontWeight: 400, fontSize: 11 },
+  },
+  "button.cell": {
+    width: "100%", minHeight: 44, textAlign: "left", font: "inherit", fontSize: 12, lineHeight: 1.3,
+    border: "1px solid transparent", borderRadius: 8, padding: "5px 7px", cursor: "pointer",
+    background: "transparent", color: "var(--muted)",
+    display: "flex", flexDirection: "column", gap: 2,
+    "&:hover, &:focus-visible": { borderColor: "var(--line)" },
+    "&.rostered": { background: "var(--surface)", borderColor: "var(--line)", color: "inherit", fontWeight: 600 },
+    "&.off": { color: "var(--muted)", fontStyle: "italic" },
+    "&.rostered.off": { background: "repeating-linear-gradient(135deg, transparent 0 6px, rgba(127,127,127,.08) 6px 12px)" },
+    "&.changed": { borderColor: "var(--forest)", boxShadow: "inset 0 0 0 1px var(--forest)" },
+    "&:disabled": { cursor: "default" },
+  },
+  ".legend": { display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: "var(--muted)" },
+  ".steps": { display: "flex", flexDirection: "column", gap: 8 },
+  ".step": { display: "flex", gap: 8, alignItems: "center" },
+});

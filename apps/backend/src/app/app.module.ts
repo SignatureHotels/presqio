@@ -18,6 +18,8 @@ import { EmployeesModule } from "./features/employees/employees.module";
 import { GeofencesModule } from "./features/geofences/geofences.module";
 import { ShiftsModule } from "./features/shifts/shifts.module";
 import { TimeOffModule } from "./features/time-off/time-off.module";
+import { RosterModule } from "./features/roster/roster.module";
+import { KiosksModule } from "./features/kiosks/kiosks.module";
 import { AttendanceModule } from "./features/attendance/attendance.module";
 import { CorrectionsModule } from "./features/corrections/corrections.module";
 import { ReportsModule } from "./features/reports/reports.module";
@@ -45,6 +47,8 @@ import { OwnerModule } from "./features/owner/owner.module";
     GeofencesModule,
     ShiftsModule,
     TimeOffModule,
+    RosterModule,
+    KiosksModule,
     AttendanceModule,
     CorrectionsModule,
     ReportsModule,

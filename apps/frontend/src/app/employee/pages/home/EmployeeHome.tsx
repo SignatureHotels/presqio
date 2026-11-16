@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { AttendanceHistoryDay, LeaveDay, Weekday } from "@presqio/lib";
+import type { AttendanceHistoryDay, EmployeeScheduleDay, LeaveDay, Weekday } from "@presqio/lib";
 import { employeeApi } from "@/api/employee-client";
 import { Icon } from "@/components";
 import { zoneLabel } from "@/utils/dates";
@@ -31,6 +31,7 @@ import {
   WeekDay,
   WeekFoot,
   SwitchRow,
+  Upcoming,
 } from "./EmployeeHome.style";
 
 const LETTER = ["M", "T", "W", "T", "F", "S", "S"];
@@ -40,6 +41,7 @@ export function EmployeeHome() {
   const now = useNow();
   const [history, setHistory] = useState<AttendanceHistoryDay[]>([]);
   const [leaves, setLeaves] = useState<LeaveDay[]>([]);
+  const [schedule, setSchedule] = useState<EmployeeScheduleDay[]>([]);
 
   useEffect(() => {
     void reload();
@@ -51,15 +53,25 @@ export function EmployeeHome() {
       .leaves()
       .then(setLeaves)
       .catch(() => undefined);
+    employeeApi
+      .schedule()
+      .then(setSchedule)
+      .catch(() => undefined);
   }, [reload]);
 
   if (!profile) return null;
   const { today, shift, branch, timezone } = profile;
   const first = profile.name.split(" ")[0];
+  // Today's shifts from the roster (two on a split day); older servers send only the usual shift.
+  const todayShifts = today.shifts ?? (shift ? [shift] : []);
+  const upcoming = schedule.filter((day) => day.date > today.date).slice(0, 6);
   const present = new Set(history.map((day) => day.date));
   const onLeave = new Set(leaves.map((leave) => leave.date));
   const week = weekOf(today.date);
+  const planned = new Map(schedule.map((day) => [day.date, day]));
   const scheduled = (date: string) => {
+    const day = planned.get(date);
+    if (day) return !day.off && !day.holiday;
     const weekday = (((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7) + 1) as Weekday;
     return shift ? shift.workingDays.includes(weekday) : true;
   };
@@ -146,7 +158,8 @@ export function EmployeeHome() {
       <Panel>
         <SectionRow>
           <h2>Today's shift</h2>
-          {shift && <span className="chip success">{shift.name}</span>}
+          {todayShifts.length > 0 && <span className="chip success">{todayShifts.map((s) => s.name).join(" + ")}</span>}
+          {today.dayOff && <span className="chip">Day off</span>}
         </SectionRow>
         <Place>
           <span className="pin">
@@ -157,24 +170,47 @@ export function EmployeeHome() {
             <small>{branch?.address || "Ask your admin if this looks wrong"}</small>
           </div>
         </Place>
-        {shift ? (
-          <Hours>
+        {todayShifts.map((s) => (
+          <Hours key={`${s.name}${s.start}`}>
             <div>
-              <p>START</p>
-              <strong>{twelveHour(shift.start)}</strong>
+              <p>{todayShifts.length > 1 ? s.name.toUpperCase() : "START"}</p>
+              <strong>{twelveHour(s.start)}</strong>
             </div>
             <div className="line">
               <Icon name="clock" className="tiny" />
             </div>
             <div className="end">
-              <p>END{shift.overnight ? " (NEXT DAY)" : ""}</p>
-              <strong>{twelveHour(shift.end)}</strong>
+              <p>END{s.overnight ? " (NEXT DAY)" : ""}</p>
+              <strong>{twelveHour(s.end)}</strong>
             </div>
           </Hours>
-        ) : (
-          <p className="muted sm">No shift assigned yet.</p>
+        ))}
+        {!todayShifts.length && (
+          <p className="muted sm">{today.dayOff ? "You're not rostered today. You can still check in if you're asked to come in." : "No shift assigned yet."}</p>
         )}
       </Panel>
+
+      {upcoming.length > 0 && (
+        <Panel>
+          <SectionRow>
+            <h2>Coming up</h2>
+          </SectionRow>
+          <Upcoming>
+            {upcoming.map((day) => (
+              <li key={day.date}>
+                <span className="when">{dayTitle(day.date)}</span>
+                <span className={day.off || day.holiday || day.onLeave ? "what off" : "what"}>
+                  {day.onLeave ? "On leave"
+                    : day.holiday ? day.holiday
+                    : day.off ? "Day off"
+                    : day.shifts.map((s) => `${s.name} ${twelveHour(s.start)}–${twelveHour(s.end)}`).join(" · ")}
+                  {day.rostered && <small> · rostered</small>}
+                </span>
+              </li>
+            ))}
+          </Upcoming>
+        </Panel>
+      )}
 
       <Panel>
         <SectionRow>

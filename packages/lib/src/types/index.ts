@@ -12,3 +12,5 @@ export type * from "./employee-portal";
 export type * from "./payroll";
 export type * from "./owner";
 export type * from "./time-off";
+export type * from "./roster";
+export type * from "./kiosk";

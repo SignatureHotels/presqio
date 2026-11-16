@@ -110,7 +110,7 @@ export class ShiftsService {
   }
 }
 
-const toRecord = (row: shifts): ShiftRecord => {
+export const toRecord = (row: shifts): ShiftRecord => {
   const policy = (row.policy_json ?? {}) as { workingDays?: Weekday[] };
   return {
     id: row.id,

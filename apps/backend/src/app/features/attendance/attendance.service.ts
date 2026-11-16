@@ -9,6 +9,7 @@ import type {
   Weekday,
 } from "@presqio/lib";
 import { DatabaseService } from "../../common/database/database.service";
+import { rosterDays } from "../roster/roster-schedule";
 import {
   addDays,
   dateOnly,
@@ -155,8 +156,12 @@ export class AttendanceService {
         continue;
       }
       const checkIn = localTime(timezone, session.opened_at);
+      // Late against the shift saved at check-in (the rostered one on a roster day), else the usual shift.
+      const saved = (session.shift_snapshot ?? {}) as ShiftSnapshot;
       const shift = shifts.get(session.employee_id);
-      const late = shift ? minutesOf(checkIn) > shift.startMinutes + shift.graceMinutes : false;
+      const late = saved.start
+        ? minutesOf(checkIn) > minutesOf(saved.start) + (saved.graceMinutes ?? 0)
+        : shift ? minutesOf(checkIn) > shift.startMinutes + shift.graceMinutes : false;
       const checkInAttempt = events.find((e) => e.type === "CHECK_IN")?.attempt_id;
       snapshots.set(session.employee_id, {
         status: late ? "Late" : "Present",
@@ -226,6 +231,7 @@ export class AttendanceService {
       }),
     ]);
     const shifts = today.shifts;
+    const roster = await rosterDays(this.db, businessId, from, date);
     const onLeave = new Set(
       leaves.map((l) => `${l.employee_id}:${l.leave_date.toISOString().slice(0, 10)}`),
     );
@@ -255,10 +261,11 @@ export class AttendanceService {
       const scheduled = employees.filter((e) => {
         const joined = localDate(timezone, e.created_at) <= day;
         const shift = shifts.get(e.id);
-        // A day off the employee took isn't a day they were expected in.
+        const rostered = roster.get(`${e.id}:${day}`);
+        // A day off the employee took (or was rostered) isn't a day they were expected in.
         return (
           joined &&
-          (!shift || shift.workingDays.includes(weekday)) &&
+          (rostered ? !rostered.off : !shift || shift.workingDays.includes(weekday)) &&
           !onLeave.has(`${e.id}:${day}`)
         );
       }).length;

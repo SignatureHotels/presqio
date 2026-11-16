@@ -35,6 +35,13 @@ export const adminNavigation = [
     description: "Plan working hours and clear attendance rules.",
   },
   {
+    path: "roster",
+    title: "Roster",
+    icon: "calendar",
+    heading: "Roster",
+    description: "Plan who works which shift each day: rotations, split shifts and days off.",
+  },
+  {
     path: "time-off",
     title: "Holidays & leave",
     icon: "calendar",

@@ -12,6 +12,7 @@ import {
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type {
+  EmployeeScheduleDay,
   AttemptOutcome,
   AttemptResponse,
   AttendanceHistoryDay,
@@ -82,6 +83,12 @@ export class EmployeePortalController {
   @Get("leave")
   leaves(@CurrentEmployee() employee: EmployeeContext): Promise<LeaveDay[]> {
     return this.portal.leaves(employee);
+  }
+
+  /** The next two weeks: shifts (from the roster or the usual shift), days off, holidays and leave. */
+  @Get("schedule")
+  schedule(@CurrentEmployee() employee: EmployeeContext): Promise<EmployeeScheduleDay[]> {
+    return this.portal.schedule(employee);
   }
 
   /** The leave types the employee can choose, their own balance this year, and upcoming holidays. */

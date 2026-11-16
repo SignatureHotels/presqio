@@ -56,6 +56,10 @@ export interface EmployeeProfile {
     earlyMinutes: number | null;
     /** The employee took leave today (and hasn't checked in). */
     onLeave: boolean;
+    /** Today's shifts from the roster or the usual shift (two on a split day); empty on a day off. */
+    shifts?: { name: string; start: string; end: string; overnight: boolean }[];
+    /** Not expected to work today (a rostered day off or a weekly off). */
+    dayOff?: boolean;
   };
 }
 export interface EmployeeSessionResponse {
