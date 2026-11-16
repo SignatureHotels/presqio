@@ -19,6 +19,7 @@ server {
         add_header Cache-Control no-cache;
     }
     location / {
-        try_files $uri $uri/ /index.html;
+        # $uri.html: the prerendered public pages (/for/shops -> for/shops.html)
+        try_files $uri $uri.html $uri/ /index.html;
     }
 }
