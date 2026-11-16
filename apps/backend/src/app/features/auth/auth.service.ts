@@ -94,6 +94,7 @@ export class AuthService {
         await this.organizations.createWithOwner(tx, {
           ownerId: user.id,
           name: dto.organizationName,
+          businessType: dto.businessType,
         });
         return user.id;
       });

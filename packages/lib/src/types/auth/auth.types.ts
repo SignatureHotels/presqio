@@ -9,6 +9,8 @@ export interface RegisterRequest {
   email: string;
   password: string;
   organizationName: string;
+  /** Chosen on an industry page (/for/…); setup then starts with it. */
+  businessType?: import("../businesses/businesses.types").BusinessType;
 }
 export interface LoginRequest {
   email: string;

@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import type { BusinessType } from "@presqio/lib";
+import { BUSINESS_PRESETS } from "@/utils/business-types";
 import { Alert, Button, Checkbox, FormControlLabel, TextField } from "@mui/material";
 import { errorMessage } from "@/api/client";
 import { PasswordField } from "@/components/password-field";
@@ -12,6 +14,9 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function RegisterPage() {
   const auth = useAuth();
   const navigate = useNavigate();
+  // From an industry page (/for/…): setup then starts with that kind of business.
+  const [params] = useSearchParams();
+  const businessType = BUSINESS_PRESETS.find((p) => p.id === params.get("type"))?.id as BusinessType | undefined;
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -59,7 +64,7 @@ export function RegisterPage() {
     setError("");
     setBusy(true);
     try {
-      await auth.register(form);
+      await auth.register({ ...form, ...(businessType && { businessType }) });
       navigate("/onboarding", { replace: true });
     } catch (caught) {
       setError(errorMessage(caught));

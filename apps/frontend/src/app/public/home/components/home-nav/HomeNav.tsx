@@ -6,6 +6,7 @@ import { Actions, LoginLink, NavBar, ProgressBar, SectionLinks } from "./HomeNav
 
 const sections = [
   { id: "how", label: "How it works" },
+  { id: "industries", label: "Industries" },
   { id: "features", label: "Features" },
   { id: "pricing", label: "Pricing" },
   { id: "faq", label: "FAQ" },
@@ -15,9 +16,14 @@ const sectionIds = sections.map((section) => section.id);
 export function HomeNav({
   signedIn,
   workspacePath,
+  away = false,
+  trialPath = "/register",
 }: {
   signedIn: boolean;
   workspacePath: string;
+  /** On another page (an industry page): section links go back to the homepage. */
+  away?: boolean;
+  trialPath?: string;
 }) {
   const { scrolled, progress } = useScrollState();
   const active = useActiveSection(sectionIds);
@@ -30,7 +36,7 @@ export function HomeNav({
         {sections.map((section) => (
           <a
             key={section.id}
-            href={`#${section.id}`}
+            href={`${away ? "/" : ""}#${section.id}`}
             aria-current={active === section.id ? "true" : undefined}
           >
             {section.label}
@@ -45,7 +51,7 @@ export function HomeNav({
         ) : (
           <>
             <LoginLink to="/login">Log in</LoginLink>
-            <Link className="btn primary" to="/register">
+            <Link className="btn primary" to={trialPath}>
               Start free trial
             </Link>
           </>

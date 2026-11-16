@@ -5,6 +5,7 @@ import { HomeNav } from "./components/home-nav";
 import { Hero } from "./components/hero";
 import { HowItWorks } from "./components/how-it-works";
 import { Features } from "./components/features";
+import { Industries } from "./components/industries";
 import { MultiBusiness } from "./components/multi-business";
 import { Pricing } from "./components/pricing";
 import { Faq } from "./components/faq";
@@ -23,7 +24,7 @@ export function HomePage() {
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
-    document.title = "Presqio · Selfie and GPS attendance for multi-branch businesses";
+    document.title = "Presqio · Selfie and GPS attendance, rosters and payroll for every kind of business";
   }, []);
 
   // Glide to in-page anchors (How it works, Pricing …) while this page is open.
@@ -43,6 +44,7 @@ export function HomePage() {
       <main>
         <Hero signedIn={signedIn} primaryPath={primaryPath} />
         <HowItWorks />
+        <Industries />
         <Features />
         <MultiBusiness signedIn={signedIn} primaryPath={primaryPath} />
         <Pricing />

@@ -12,6 +12,7 @@ const ForgotPasswordPage = lazyPage(() => import("@/app/auth/forgot-password/For
 const ResetPasswordPage = lazyPage(() => import("@/app/auth/reset-password/ResetPasswordPage"), "ResetPasswordPage");
 const VerifyEmailPage = lazyPage(() => import("@/app/auth/verify-email/VerifyEmailPage"), "VerifyEmailPage");
 const InvitePage = lazyPage(() => import("@/app/auth/invite/InvitePage"), "InvitePage");
+const IndustryPage = lazyPage(() => import("@/app/public/industry/IndustryPage"), "IndustryPage");
 const SelectOrganizationPage = lazyPage(() => import("@/app/select-organization"), "SelectOrganizationPage");
 const OnboardingPage = lazyPage(() => import("@/app/onboarding"), "OnboardingPage");
 const AdminWorkspace = lazyPage(() => import("@/app/admin/AdminWorkspace"), "default");
@@ -28,6 +29,7 @@ export function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/for/:slug" element={<Suspense fallback={pageFallback}><IndustryPage /></Suspense>} />
       <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
       <Route path="/register" element={<Suspense fallback={pageFallback}><GuestOnly><RegisterPage /></GuestOnly></Suspense>} />
       <Route path="/forgot-password" element={<Suspense fallback={pageFallback}><ForgotPasswordPage /></Suspense>} />

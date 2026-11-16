@@ -3,11 +3,11 @@ import { Eyebrow } from "../../HomePage.style";
 import { revealState, stagger, useReveal } from "../../hooks/use-reveal";
 import { Band, Copy, Tree, TreeChildren, TreeNode } from "./MultiBusiness.style";
 
-// Example organization: one hotel group whose hotels are its branches.
+// Example organization: a retail group whose stores are its branches.
 const exampleBranches = [
-  { name: "Hiwa Boutique", meta: "Branch · Medipalli" },
-  { name: "Hotel Airport Zone", meta: "Branch" },
-  { name: "Elite Hotel", meta: "Branch" },
+  { name: "MG Road store", meta: "Store · manager: Ravi" },
+  { name: "Kukatpally store", meta: "Store · manager: Priya" },
+  { name: "Central warehouse", meta: "Warehouse · gate kiosk" },
 ];
 
 export function MultiBusiness({
@@ -27,8 +27,9 @@ export function MultiBusiness({
         </Eyebrow>
         <h2 style={stagger(1)}>One login for every branch you run</h2>
         <p style={stagger(2)}>
-          Your organization is the whole group, and every hotel, shop or outlet is a branch
-          with its own check-in perimeter, shifts and employees. Owners and admins review all their branches from one workspace.
+          Your organization is the whole group, and every store, outlet, plant or site is a branch
+          with its own check-in perimeter, shifts and employees. Owners see everything; each branch
+          manager sees only their own.
         </p>
         <Link className="btn primary" to={primaryPath} style={stagger(3)}>
           {signedIn ? "Open workspace" : "Create your organization"}
@@ -36,7 +37,7 @@ export function MultiBusiness({
       </Copy>
       <Tree aria-hidden="true">
         <TreeNode root data-reveal={state} style={stagger(2)}>
-          Signature Group of Hotels
+          Sri Ganesh Stores
         </TreeNode>
         <TreeChildren data-reveal-children={state}>
           {exampleBranches.map((branch, index) => (

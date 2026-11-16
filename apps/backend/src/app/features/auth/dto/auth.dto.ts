@@ -1,5 +1,7 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { BUSINESS_TYPES } from "../../organizations/dto/organization.dto";
 import type {
+  BusinessType,
   RegisterWithInvitationRequest,
   ForgotPasswordRequest,
   LoginRequest,
@@ -8,7 +10,7 @@ import type {
   VerifyEmailRequest,
 } from "@presqio/lib";
 import { Transform } from "class-transformer";
-import { IsEmail, IsString, Length, MaxLength } from "class-validator";
+import { IsEmail, IsIn, IsOptional, IsString, Length, MaxLength } from "class-validator";
 import { PASSWORD_MAX, PASSWORD_MIN } from "../password-policy";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -38,6 +40,10 @@ export class RegisterDto implements RegisterRequest {
   @IsString()
   @Length(2, 80)
   organizationName!: string;
+
+  @ApiPropertyOptional({ enum: BUSINESS_TYPES })
+  @IsOptional() @IsIn(BUSINESS_TYPES)
+  businessType?: BusinessType;
 }
 
 export class LoginDto implements LoginRequest {

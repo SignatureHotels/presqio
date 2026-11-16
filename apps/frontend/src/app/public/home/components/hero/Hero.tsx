@@ -13,13 +13,14 @@ export function Hero({
   return (
     <HeroSection>
       <div>
-        <Badge>Attendance for multi-branch teams</Badge>
+        <Badge>Attendance, rosters and payroll</Badge>
         <Headline>
-          Know who's on site, <em>at every branch.</em>
+          Know who's at work, <em>wherever they work.</em>
         </Headline>
         <Lead>
-          Presqio checks each employee in with a fresh selfie and a GPS reading inside the
-          branch perimeter. Run one hotel or a whole group of branches from one dashboard.
+          Shops, restaurants, clinics, factories, sites and field teams: every check-in has a live
+          selfie and a GPS check at the workplace. Rosters, leave and payroll follow from it, from one
+          branch to a hundred.
         </Lead>
         <Actions>
           <LargeLink className="btn primary" to={primaryPath}>
@@ -30,7 +31,7 @@ export function Hero({
             See how it works
           </LargeAnchor>
         </Actions>
-        <Note>No card needed · Works in any phone browser</Note>
+        <Note>No card needed · Works in any phone browser · English, हिंदी, తెలుగు</Note>
       </div>
       <HeroPreview />
     </HeroSection>

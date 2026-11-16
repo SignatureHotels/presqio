@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { INDUSTRIES } from "../../../industries";
 import { Footer, FooterLinks } from "./HomeFooter.style";
 
 export function HomeFooter() {
@@ -11,6 +12,9 @@ export function HomeFooter() {
       <FooterLinks aria-label="Footer">
         <Link to="/login">Admin login</Link>
         <Link to="/employee">Employee check-in</Link>
+      </FooterLinks>
+      <FooterLinks aria-label="Presqio for your business" style={{ flexBasis: "100%", flexWrap: "wrap", justifyContent: "center", gap: "6px 16px" }}>
+        {INDUSTRIES.map((i) => <Link key={i.slug} to={`/for/${i.slug}`}>{i.name}</Link>)}
       </FooterLinks>
     </Footer>
   );

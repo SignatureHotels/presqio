@@ -20,6 +20,18 @@ const faqs = [
     a: "No. Location is read only at the moment of check-in or check-out. There is no background tracking.",
   },
   {
+    q: "What if my staff don't have smartphones?",
+    a: "Put a kiosk tablet at the entrance: staff type their employee ID and take a selfie. They can also sign in on a colleague's phone.",
+  },
+  {
+    q: "Can I pay people by the day or the hour?",
+    a: "Yes. Each person's salary can be monthly, daily or hourly, with overtime worked out from their check-ins.",
+  },
+  {
+    q: "Can a manager see only their own branch?",
+    a: "Yes. Invite them as a branch manager for the branches they run. They won't see payroll, settings or other branches.",
+  },
+  {
     q: "What happens after the 14-day trial?",
     a: "You choose a plan that fits your number of branches and employees. Your setup and records stay in place.",
   },

@@ -4,12 +4,15 @@ import { revealState, stagger, useReveal } from "../../hooks/use-reveal";
 import { Feature, FeatureGrid, FeatureIcon } from "./Features.style";
 
 const features = [
-  { icon: "map", title: "Branch perimeters", text: "Set a radius per branch and reject check-ins with poor GPS accuracy." },
-  { icon: "camera", title: "Selfies for every punch", text: "Check-in and check-out photos are saved with attendance for admin review." },
-  { icon: "clock", title: "Shifts and grace time", text: "Day, night and overnight shifts with grace periods and working days." },
-  { icon: "check", title: "Corrections with approval", text: "Missed punches go through a reviewed request with a reason and audit trail." },
-  { icon: "report", title: "Attendance grid and CSV", text: "Compare dates, in/out times, worked hours and selfies, and export attendance as CSV." },
-  { icon: "shield", title: "Organization workspaces", text: "Owners and admins manage their organization's branches, employees and attendance." },
+  { icon: "camera", title: "Selfie and GPS check-in", text: "A live selfie inside the workplace perimeter for every check-in and check-out. No background tracking." },
+  { icon: "calendar", title: "Rosters and rotations", text: "Split shifts, night shifts, weekly offs and rotations filled for weeks at once." },
+  { icon: "users", title: "Kiosk for shared devices", text: "One tablet at the entrance: type your ID, take a selfie. No personal phone needed." },
+  { icon: "map", title: "Many sites, or anywhere", text: "Staff who move between sites check in at any of theirs; field teams from anywhere." },
+  { icon: "sun", title: "Leave and holidays", text: "Leave types with yearly allowances, and holidays that never count as absences." },
+  { icon: "file", title: "Payroll from attendance", text: "Monthly, daily or hourly pay, overtime from check-ins, and payslips." },
+  { icon: "shield", title: "Branch managers", text: "Invite managers who see only their branches, and viewers who can't change anything." },
+  { icon: "check", title: "Corrections with approval", text: "Missed punches fixed through a reviewed request with a reason and audit trail." },
+  { icon: "user", title: "In your team's language", text: "The employee app and kiosk work in English, Hindi and Telugu." },
 ];
 
 export function Features() {
@@ -20,7 +23,7 @@ export function Features() {
       <SectionIntro data-reveal-children={state}>
         <Eyebrow style={stagger(0)}>Features</Eyebrow>
         <SectionTitle style={stagger(1)}>
-          Everything a branch manager used to chase on paper
+          Everything you used to chase on paper and WhatsApp
         </SectionTitle>
       </SectionIntro>
       <FeatureGrid data-reveal-children={state}>
