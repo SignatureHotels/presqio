@@ -4,6 +4,7 @@ import type { AttendanceHistoryDay, EmployeeScheduleDay, LeaveDay, Weekday } fro
 import { employeeApi } from "@/api/employee-client";
 import { Icon } from "@/components";
 import { zoneLabel } from "@/utils/dates";
+import { useT } from "@/i18n";
 import { useEmployeeSession } from "../../context/employee-session";
 import { MobileShell } from "../../components/mobile-shell";
 import { Panel, SectionRow } from "../../EmployeeApp.style";
@@ -15,6 +16,7 @@ import {
   twelveHour,
   useNow,
   weekOf,
+  weekdayLetter,
 } from "../../utils/time";
 import {
   Clock,
@@ -34,14 +36,13 @@ import {
   Upcoming,
 } from "./EmployeeHome.style";
 
-const LETTER = ["M", "T", "W", "T", "F", "S", "S"];
-
 export function EmployeeHome() {
   const { profile, reload, signOut } = useEmployeeSession();
   const now = useNow();
   const [history, setHistory] = useState<AttendanceHistoryDay[]>([]);
   const [leaves, setLeaves] = useState<LeaveDay[]>([]);
   const [schedule, setSchedule] = useState<EmployeeScheduleDay[]>([]);
+  const t = useT();
 
   useEffect(() => {
     void reload();
@@ -95,18 +96,18 @@ export function EmployeeHome() {
           <span>{dayTitle(today.date)}</span>
           <StateChip tone={tone}>
             {today.state === "CHECKED_IN"
-              ? `Checked in ${today.checkIn}`
+              ? t("home.checkedInAt", { time: today.checkIn ?? "" })
               : today.state === "CHECKED_OUT"
-                ? "Done for today"
+                ? t("home.doneToday")
                 : today.onLeave
-                  ? "On leave today"
-                  : "Not checked in"}
+                  ? t("home.onLeaveToday")
+                  : t("home.notCheckedIn")}
           </StateChip>
         </StateRow>
         <Clock>{clockIn(timezone, now)}</Clock>
         <ClockSub>
           {zoneLabel(timezone)}
-          {today.status === "Late" && " · You checked in late today"}
+          {today.status === "Late" && ` · ${t("home.lateToday")}`}
         </ClockSub>
         {today.state === "CHECKED_OUT" ? (
           <DoneNote>
@@ -114,16 +115,16 @@ export function EmployeeHome() {
               {today.checkIn} – {today.checkOut}
             </strong>
             {today.earlyMinutes
-              ? `Checked out ${earlyLabel(today.earlyMinutes)} before your shift ended. It's recorded.`
-              : "Thanks, your day is recorded."}
+              ? t("home.earlyOut", { duration: earlyLabel(today.earlyMinutes) })
+              : t("home.thanks")}
             <br />
-            <Link to="/employee/check/in">Check in again</Link>
+            <Link to="/employee/check/in">{t("home.checkInAgain")}</Link>
           </DoneNote>
         ) : (
           <>
             {today.onLeave && (
               <DoneNote>
-                Enjoy your day off. If you come in after all, checking in cancels today's leave.
+                {t("home.enjoyLeave")}
               </DoneNote>
             )}
             <PunchButton
@@ -131,80 +132,80 @@ export function EmployeeHome() {
               out={today.state === "CHECKED_IN"}
             >
               <Icon name={today.state === "CHECKED_IN" ? "logout" : "camera"} />
-              {today.state === "CHECKED_IN" ? "Check out" : "Check in"}
+              {today.state === "CHECKED_IN" ? t("action.checkOut") : t("action.checkIn")}
             </PunchButton>
           </>
         )}
         <TrustRow>
           <span>
-            <Icon name="map" className="tiny" /> Inside branch
+            <Icon name="map" className="tiny" /> {t("home.trustInside")}
           </span>
           <span>
-            <Icon name="camera" className="tiny" /> Live selfie
+            <Icon name="camera" className="tiny" /> {t("home.trustSelfie")}
           </span>
           <span>
-            <Icon name="shield" className="tiny" /> Server-checked
+            <Icon name="shield" className="tiny" /> {t("home.trustServer")}
           </span>
         </TrustRow>
       </PunchCard>
       {/* Shared phones: the next person signs out the previous one before checking in. */}
       <SwitchRow>
-        Not {first}?{" "}
+        {t("home.notYou", { name: first })}{" "}
         <button type="button" onClick={() => void signOut()}>
-          Switch employee
+          {t("home.switch")}
         </button>
       </SwitchRow>
 
       <Panel>
         <SectionRow>
-          <h2>Today's shift</h2>
+          <h2>{t("home.todayShift")}</h2>
           {todayShifts.length > 0 && <span className="chip success">{todayShifts.map((s) => s.name).join(" + ")}</span>}
-          {today.dayOff && <span className="chip">Day off</span>}
+          {today.dayOff && <span className="chip">{t("home.dayOff")}</span>}
         </SectionRow>
         <Place>
           <span className="pin">
             <Icon name="pin" />
           </span>
           <div>
-            <strong>{branch?.name ?? "No branch assigned"}</strong>
-            <small>{branch?.address || "Ask your admin if this looks wrong"}</small>
+            <strong>{branch?.name ?? t("home.noBranch")}</strong>
+            <small>{branch?.address || t("home.branchHelp")}</small>
           </div>
         </Place>
         {todayShifts.map((s) => (
           <Hours key={`${s.name}${s.start}`}>
             <div>
-              <p>{todayShifts.length > 1 ? s.name.toUpperCase() : "START"}</p>
+              <p>{todayShifts.length > 1 ? s.name.toUpperCase() : t("home.start")}</p>
               <strong>{twelveHour(s.start)}</strong>
             </div>
             <div className="line">
               <Icon name="clock" className="tiny" />
             </div>
             <div className="end">
-              <p>END{s.overnight ? " (NEXT DAY)" : ""}</p>
+              <p>{t("home.end")}{s.overnight ? ` ${t("home.nextDay")}` : ""}</p>
               <strong>{twelveHour(s.end)}</strong>
             </div>
           </Hours>
         ))}
         {!todayShifts.length && (
-          <p className="muted sm">{today.dayOff ? "You're not rostered today. You can still check in if you're asked to come in." : "No shift assigned yet."}</p>
+          <p className="muted sm">{today.dayOff ? t("home.notRostered") : t("home.noShift")}</p>
         )}
       </Panel>
 
       {upcoming.length > 0 && (
         <Panel>
           <SectionRow>
-            <h2>Coming up</h2>
+            <h2>{t("home.comingUp")}</h2>
           </SectionRow>
           <Upcoming>
             {upcoming.map((day) => (
               <li key={day.date}>
                 <span className="when">{dayTitle(day.date)}</span>
                 <span className={day.off || day.holiday || day.onLeave ? "what off" : "what"}>
-                  {day.onLeave ? "On leave"
+                  {day.onLeave ? t("home.onLeave")
                     : day.holiday ? day.holiday
-                    : day.off ? "Day off"
+                    : day.off ? t("home.dayOff")
                     : day.shifts.map((s) => `${s.name} ${twelveHour(s.start)}–${twelveHour(s.end)}`).join(" · ")}
-                  {day.rostered && <small> · rostered</small>}
+                  {day.rostered && <small> · {t("home.rostered")}</small>}
                 </span>
               </li>
             ))}
@@ -214,11 +215,11 @@ export function EmployeeHome() {
 
       <Panel>
         <SectionRow>
-          <h2>This week</h2>
-          <Link to="/employee/history">View history →</Link>
+          <h2>{t("home.thisWeek")}</h2>
+          <Link to="/employee/history">{t("home.viewHistory")}</Link>
         </SectionRow>
         <Week>
-          {week.map((date, index) => {
+          {week.map((date) => {
             const kind = present.has(date)
               ? "present"
               : onLeave.has(date)
@@ -232,7 +233,7 @@ export function EmployeeHome() {
                       : "future";
             return (
               <WeekDay key={date} kind={kind}>
-                {LETTER[index]}
+                {weekdayLetter(date)}
                 <span>{Number(date.slice(8))}</span>
               </WeekDay>
             );
@@ -240,13 +241,13 @@ export function EmployeeHome() {
         </Week>
         <WeekFoot>
           <div>
-            Days present
+            {t("home.daysPresent")}
             <b>
               {daysPresent} / {daysScheduled || 0}
             </b>
           </div>
           {daysScheduled > 0 && daysPresent >= daysScheduled && (
-            <span className="chip success">Perfect week so far ✨</span>
+            <span className="chip success">{t("home.perfectWeek")}</span>
           )}
         </WeekFoot>
       </Panel>

@@ -10,7 +10,8 @@ import {
   TextField,
 } from "@mui/material";
 import type { AttendanceHistoryDay, EmployeeCorrection } from "@presqio/lib";
-import { errorMessage } from "@/api/client";
+import { errorText, useT, type MessageKey } from "@/i18n";
+import { shortMonth } from "../../utils/time";
 import { employeeApi } from "@/api/employee-client";
 import { Icon } from "@/components";
 import { StatusChip } from "@/components/status-chip";
@@ -24,42 +25,39 @@ export function RequestsPage() {
   const [days, setDays] = useState<AttendanceHistoryDay[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
+  const t = useT();
 
   useEffect(() => {
-    employeeApi.corrections().then(setRequests).catch((caught) => setError(errorMessage(caught)));
+    employeeApi.corrections().then(setRequests).catch((caught) => setError(errorText(caught)));
     employeeApi.history().then(setDays).catch(() => undefined);
   }, []);
 
   return (
-    <MobileShell title="My requests" subtitle="Fix a missed or wrong punch">
+    <MobileShell title={t("req.title")} subtitle={t("req.subtitle")}>
       <Panel>
         <NewRequest>
-          <strong>Missed a check-out or wrong time?</strong>
-          <p>Send a correction to your admin. Your original check-in record is kept.</p>
+          <strong>{t("req.heading")}</strong>
+          <p>{t("req.intro")}</p>
           <Button variant="contained" startIcon={<Icon name="plus" className="tiny" />} onClick={() => setOpen(true)} disabled={!days.length}>
-            New correction request
+            {t("req.new")}
           </Button>
-          {!days.length && <small>You can request a correction after your first check-in.</small>}
+          {!days.length && <small>{t("req.afterFirst")}</small>}
         </NewRequest>
       </Panel>
       {error && <Empty>{error}</Empty>}
-      {requests && requests.length === 0 && <Empty>No requests yet.</Empty>}
+      {requests && requests.length === 0 && <Empty>{t("req.none")}</Empty>}
       <DayList>
         {(requests ?? []).map((request) => (
           <DayRow key={request.id}>
             <div className="date">
               <strong>{Number(request.date.slice(8))}</strong>
-              <small>
-                {new Date(`${request.date}T00:00:00Z`)
-                  .toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" })
-                  .toUpperCase()}
-              </small>
+              <small>{shortMonth(request.date)}</small>
             </div>
             <div className="info">
-              <strong>{request.type}</strong>
+              <strong>{t(`corr.${request.type}` as MessageKey)}</strong>
               <small>{request.decisionReason ?? request.reason}</small>
             </div>
-            <StatusChip status={request.status} />
+            <StatusChip status={request.status} label={t(`status.${request.status}` as MessageKey)} />
           </DayRow>
         ))}
       </DayList>
@@ -92,9 +90,10 @@ function CorrectionDialog({
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   async function send() {
-    if (reason.trim().length < 5) return setError("Please explain what happened (at least 5 characters).");
+    if (reason.trim().length < 5) return setError(t("req.explain"));
     setBusy(true);
     setError("");
     try {
@@ -106,30 +105,30 @@ function CorrectionDialog({
         }),
       );
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(errorText(caught));
       setBusy(false);
     }
   }
 
   return (
     <Dialog open onClose={busy ? undefined : onClose} fullWidth>
-      <DialogTitle>Correction request</DialogTitle>
+      <DialogTitle>{t("req.dialog")}</DialogTitle>
       <DialogContent className="dialog-fields">
         {error && <Alert severity="error">{error}</Alert>}
-        <TextField select label="Day" value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
+        <TextField select label={t("req.day")} value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
           {days.map((day) => (
             <MenuItem key={day.sessionId} value={day.sessionId}>
-              {day.date} · {day.checkIn}–{day.checkOut ?? "no check-out"}
+              {day.date} · {day.checkIn}–{day.checkOut ?? t("req.noOut")}
             </MenuItem>
           ))}
         </TextField>
-        <TextField select label="What needs fixing" value={kind} onChange={(e) => setKind(e.target.value as "in" | "out")}>
-          <MenuItem value="out">Check-out time (missed or wrong)</MenuItem>
-          <MenuItem value="in">Check-in time</MenuItem>
+        <TextField select label={t("req.what")} value={kind} onChange={(e) => setKind(e.target.value as "in" | "out")}>
+          <MenuItem value="out">{t("req.outOption")}</MenuItem>
+          <MenuItem value="in">{t("req.inOption")}</MenuItem>
         </TextField>
         <TextField
           type="time"
-          label={kind === "out" ? "Correct check-out time" : "Correct check-in time"}
+          label={kind === "out" ? t("req.correctOut") : t("req.correctIn")}
           value={time}
           onChange={(e) => setTime(e.target.value)}
           slotProps={{ inputLabel: { shrink: true } }}
@@ -137,19 +136,19 @@ function CorrectionDialog({
         <TextField
           multiline
           rows={3}
-          label="Reason"
+          label={t("req.reason")}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="e.g. Phone battery died before I could check out"
+          placeholder={t("req.reasonPlaceholder")}
           slotProps={{ htmlInput: { maxLength: 500 } }}
         />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={busy}>
-          Cancel
+          {t("req.cancel")}
         </Button>
         <Button variant="contained" onClick={() => void send()} disabled={busy}>
-          {busy ? "Sending…" : "Send request"}
+          {busy ? t("req.sending") : t("req.send")}
         </Button>
       </DialogActions>
     </Dialog>

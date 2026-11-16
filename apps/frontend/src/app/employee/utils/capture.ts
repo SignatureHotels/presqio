@@ -1,3 +1,5 @@
+import { t } from "@/i18n";
+
 /** Asks for the front camera. */
 export const openFrontCamera = () =>
   navigator.mediaDevices.getUserMedia({
@@ -21,7 +23,7 @@ const MAX_DATA_URL = 780_000;
 /** Square JPEG of the current frame, shrunk until it fits the upload limit (usually 50–150 KB). */
 export function captureSelfie(video: HTMLVideoElement): string {
   const side = Math.min(video.videoWidth, video.videoHeight);
-  if (!side || video.readyState < 2) throw new Error("Camera is still getting ready. Please try again.");
+  if (!side || video.readyState < 2) throw new Error(t("photo.notReady"));
   let size = Math.min(640, side);
   let quality = 0.82;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -29,7 +31,7 @@ export function captureSelfie(video: HTMLVideoElement): string {
     canvas.width = size;
     canvas.height = size;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("Could not prepare the photo on this browser.");
+    if (!context) throw new Error(t("photo.failBrowser"));
     context.drawImage(
       video,
       (video.videoWidth - side) / 2,
@@ -46,5 +48,5 @@ export function captureSelfie(video: HTMLVideoElement): string {
     quality -= 0.12;
     size = Math.round(size * 0.85);
   }
-  throw new Error("Could not prepare the photo. Please try again.");
+  throw new Error(t("photo.fail"));
 }

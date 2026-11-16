@@ -1,4 +1,5 @@
-export function StatusChip({ status }: { status: string }) {
+/** `label` shows the status in another language; the colour still follows `status`. */
+export function StatusChip({ status, label }: { status: string; label?: string }) {
   const color =
     (
       {
@@ -11,5 +12,5 @@ export function StatusChip({ status }: { status: string }) {
         Rejected: "error",
       } as Record<string, string>
     )[status] ?? "neutral";
-  return <span className={`chip ${color}`}>{status}</span>;
+  return <span className={`chip ${color}`}>{label ?? status}</span>;
 }

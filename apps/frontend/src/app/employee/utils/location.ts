@@ -1,3 +1,4 @@
+import { t } from "@/i18n";
 export interface Fix {
   latitude: number;
   longitude: number;
@@ -11,7 +12,7 @@ export interface Fix {
  */
 export function watchBestFix(onFix: (fix: Fix) => void, onError: (message: string) => void) {
   if (!("geolocation" in navigator)) {
-    onError("This phone's browser can't share its location.");
+    onError(t("loc.unsupported"));
     return () => undefined;
   }
   let best: Fix | null = null;
@@ -34,8 +35,8 @@ export function watchBestFix(onFix: (fix: Fix) => void, onError: (message: strin
     (error) =>
       onError(
         error.code === error.PERMISSION_DENIED
-          ? "Location permission is off. Allow location for this site in your browser settings."
-          : "We couldn't get your location. Move near a window or step outside and try again.",
+          ? t("loc.denied")
+          : t("loc.failed"),
       ),
     { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 },
   );

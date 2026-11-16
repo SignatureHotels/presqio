@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Alert, Button } from "@mui/material";
 import type { AttemptOutcome } from "@presqio/lib";
-import { errorMessage } from "@/api/client";
+import { errorText, rejectionText, useT } from "@/i18n";
 import { employeeApi } from "@/api/employee-client";
 import { Icon } from "@/components";
 import { useEmployeeSession } from "../../context/employee-session";
@@ -29,7 +29,8 @@ type Phase = "preparing" | "ready" | "sending" | "done";
 export function CheckPage() {
   const { action: param } = useParams();
   const action = param === "out" ? "CHECK_OUT" : "CHECK_IN";
-  const verb = action === "CHECK_IN" ? "Check in" : "Check out";
+  const t = useT();
+  const verb = action === "CHECK_IN" ? t("action.checkIn") : t("action.checkOut");
   const { profile, setProfile } = useEmployeeSession();
   const navigate = useNavigate();
   const video = useRef<HTMLVideoElement>(null);
@@ -69,12 +70,12 @@ export function CheckPage() {
         if (cancelled) return;
         setCameraError(
           e.name === "NotAllowedError"
-            ? "Camera permission is off. Allow the camera for this site in your browser settings."
-            : "We couldn't open the camera on this device.",
+            ? t("check.cameraOff")
+            : t("check.cameraFail"),
         );
       });
     const stopWatch = watchBestFix(setFix, setGpsError);
-    startAttempt().catch((caught) => setError(errorMessage(caught)));
+    startAttempt().catch((caught) => setError(errorText(caught)));
     return () => {
       cancelled = true;
       stopWatch();
@@ -86,7 +87,7 @@ export function CheckPage() {
   useEffect(() => {
     if (phase === "ready" && video.current && stream.current) {
       void showStream(video.current, stream.current).catch(() =>
-        setCameraError("Could not resume the camera. Go back and try again."),
+        setCameraError(t("check.cameraResume")),
       );
     }
   }, [phase]);
@@ -98,7 +99,7 @@ export function CheckPage() {
     try {
       selfie = captureSelfie(video.current);
     } catch (caught) {
-      return setError(errorMessage(caught));
+      return setError(errorText(caught));
     }
     setPhoto(selfie);
     setPhase("sending");
@@ -112,7 +113,7 @@ export function CheckPage() {
       setPhase("done");
     } catch (caught) {
       // Expired or already-used attempts: get a new one so "Try again" just works.
-      setError(errorMessage(caught));
+      setError(errorText(caught));
       setPhoto(null);
       setPhase("ready");
       startAttempt().catch(() => undefined);
@@ -124,11 +125,11 @@ export function CheckPage() {
     setOutcome(null);
     setPhoto(null);
     setPhase("ready");
-    await startAttempt().catch((caught) => setError(errorMessage(caught)));
+    await startAttempt().catch((caught) => setError(errorText(caught)));
   }
 
   // Check-out happens at the home branch's perimeter; check-in at any of the employee's sites.
-  const sites = [profile?.branch, ...(verb === "Check in" ? (profile?.otherSites ?? []) : [])].filter(
+  const sites = [profile?.branch, ...(action === "CHECK_IN" ? (profile?.otherSites ?? []) : [])].filter(
     (b): b is NonNullable<typeof b> => Boolean(b?.radius),
   );
   const measured = fix
@@ -151,39 +152,36 @@ export function CheckPage() {
           </span>
           {outcome.accepted ? (
             <>
-              <h2>{outcome.action === "CHECK_IN" ? "You're checked in" : "You're checked out"}</h2>
+              <h2>{outcome.action === "CHECK_IN" ? t("check.checkedIn") : t("check.checkedOut")}</h2>
               <div className="time">{outcome.time}</div>
               {outcome.earlyMinutes ? (
-                <p>
-                  Recorded {earlyLabel(outcome.earlyMinutes)} before your shift ends. Your admin can see
-                  this check-out time.
-                </p>
+                <p>{t("check.earlyRecorded", { duration: earlyLabel(outcome.earlyMinutes) })}</p>
               ) : null}
               <p>
                 {outcome.offsite
-                  ? "Recorded away from your sites, with your location."
-                  : `${outcome.branchName ?? branch?.name} · ${outcome.distance} m from the site.`}{" "}
-                Your selfie was saved with this record.
+                  ? t("check.offsiteRecorded")
+                  : t("check.atSite", { site: outcome.branchName ?? branch?.name ?? "", distance: outcome.distance ?? 0 })}{" "}
+                {t("check.selfieSaved")}
               </p>
             </>
           ) : (
             <>
-              <h2>Not recorded</h2>
-              <p>{outcome.message}</p>
+              <h2>{t("check.notRecorded")}</h2>
+              <p>{rejectionText(outcome)}</p>
             </>
           )}
         </Result>
         <Actions>
           {outcome.accepted ? (
             <Button variant="contained" onClick={() => navigate("/employee", { replace: true })}>
-              Done
+              {t("check.done")}
             </Button>
           ) : (
             <>
               <Button variant="contained" onClick={() => void retry()}>
-                Try again
+                {t("check.tryAgain")}
               </Button>
-              <Button onClick={() => navigate("/employee")}>Back to home</Button>
+              <Button onClick={() => navigate("/employee")}>{t("check.backHome")}</Button>
             </>
           )}
         </Actions>
@@ -194,27 +192,26 @@ export function CheckPage() {
   return (
     <Screen>
       <TopBar>
-        <Link to="/employee" aria-label="Back">
+        <Link to="/employee" aria-label={t("check.back")}>
           <Icon name="back" />
         </Link>
         <h1>{verb}</h1>
       </TopBar>
       {!secure && (
         <Alert severity="warning">
-          Camera and location only work over a secure (https) connection. Open Presqio from its https
-          address.
+          {t("check.insecure")}
         </Alert>
       )}
       {error && <Alert severity="error">{error}</Alert>}
       <Viewfinder>
         {/* The camera stays mounted so "Try again" reuses it; the captured photo sits on top. */}
-        <video ref={video} playsInline muted aria-label="Camera preview" />
-        {photo && <img src={photo} alt="Your selfie" />}
+        <video ref={video} playsInline muted aria-label={t("check.preview")} />
+        {photo && <img src={photo} alt={t("check.yourSelfie")} />}
         {!photo && phase === "ready" && <Guide />}
         {phase === "sending" && <Scan />}
         {(cameraError || (phase === "preparing" && secure)) && (
           <div className="placeholder">
-            {cameraError || "Opening camera…"}
+            {cameraError || t("check.openingCamera")}
           </div>
         )}
       </Viewfinder>
@@ -225,23 +222,23 @@ export function CheckPage() {
           </Chip>
         ) : !fix ? (
           <Chip tone="wait">
-            <Icon name="map" className="tiny" /> Finding your location…
+            <Icon name="map" className="tiny" /> {t("check.findingLocation")}
           </Chip>
         ) : (
           <>
             <Chip tone={gpsGood ? "ok" : "wait"}>
-              <Icon name="map" className="tiny" /> GPS ±{Math.round(fix.accuracy)} m
-              {!gpsGood && " · improving…"}
+              <Icon name="map" className="tiny" /> {t("check.gps", { metres: Math.round(fix.accuracy) })}
+              {!gpsGood && ` ${t("check.improving")}`}
             </Chip>
             {distance !== null && (
               <Chip tone={inside || anywhere ? "ok" : "bad"}>
                 <Icon name="pin" className="tiny" />
-                {inside ? `At ${branch?.name}` : anywhere ? "Away from your sites · allowed" : `${distance} m from ${branch?.name}`}
+                {inside ? t("check.atBranch", { branch: branch?.name ?? "" }) : anywhere ? t("check.awayAllowed") : t("check.fromBranch", { metres: distance, branch: branch?.name ?? "" })}
               </Chip>
             )}
             {distance === null && anywhere && (
               <Chip tone="ok">
-                <Icon name="pin" className="tiny" /> You can check in from here
+                <Icon name="pin" className="tiny" /> {t("check.canHere")}
               </Chip>
             )}
           </>
@@ -253,9 +250,9 @@ export function CheckPage() {
         disabled={phase !== "ready" || !fix || !attemptId || Boolean(cameraError)}
       >
         <Icon name="camera" />
-        {phase === "sending" ? "Checking…" : `Take selfie & ${verb.toLowerCase()}`}
+        {phase === "sending" ? t("check.checking") : action === "CHECK_IN" ? t("check.takeIn") : t("check.takeOut")}
       </Shutter>
-      <PrivacyNote>Your location is checked once, now. Presqio doesn't track you in the background.</PrivacyNote>
+      <PrivacyNote>{t("check.privacy")}</PrivacyNote>
     </Screen>
   );
 }

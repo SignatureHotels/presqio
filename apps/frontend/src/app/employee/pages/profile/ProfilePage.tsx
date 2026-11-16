@@ -1,4 +1,6 @@
 import { Button } from "@mui/material";
+import { useT } from "@/i18n";
+import { LanguagePicker } from "@/i18n/LanguagePicker";
 import { initials } from "@/utils/format";
 import { longDate, zoneLabel } from "@/utils/dates";
 import { useEmployeeSession } from "../../context/employee-session";
@@ -9,27 +11,32 @@ import { Hero, Lines, Note } from "./ProfilePage.style";
 
 export function ProfilePage() {
   const { profile, signOut } = useEmployeeSession();
+  const t = useT();
   if (!profile) return null;
   const rows: [string, string][] = [
-    ["Organization", profile.organizationName],
-    ["Department", profile.department || "—"],
-    ["Date of joining", profile.joinedOn ? longDate(profile.joinedOn) : "—"],
-    ["Branch", profile.branch?.name ?? "Not assigned"],
+    [t("profile.organization"), profile.organizationName],
+    [t("profile.department"), profile.department || "—"],
+    [t("profile.joined"), profile.joinedOn ? longDate(profile.joinedOn) : "—"],
+    [t("profile.branch"), profile.branch?.name ?? t("profile.notAssigned")],
     [
-      "Shift",
+      t("profile.shift"),
       profile.shift
         ? `${twelveHour(profile.shift.start)} – ${twelveHour(profile.shift.end)}`
-        : "Not assigned",
+        : t("profile.notAssigned"),
     ],
-    ["Check-in perimeter", profile.branch ? `${profile.branch.radius} m around the branch` : "—"],
-    ["Time zone", zoneLabel(profile.timezone)],
-    ["Sign-in", `Employee ID ${profile.code}`],
-    ["Phone", profile.phone || "Not provided"],
-    ["Email", profile.email || "Not provided"],
-    ["Date of birth", profile.dateOfBirth ? longDate(profile.dateOfBirth) : "—"],
+    [t("profile.perimeter"), profile.branch ? t("profile.perimeterValue", { metres: profile.branch.radius }) : "—"],
+    [t("profile.timezone"), zoneLabel(profile.timezone)],
+    [t("profile.signIn"), t("profile.signInValue", { code: profile.code })],
+    [t("profile.phone"), profile.phone || t("profile.notProvided")],
+    [t("profile.email"), profile.email || t("profile.notProvided")],
+    [t("profile.birth"), profile.dateOfBirth ? longDate(profile.dateOfBirth) : "—"],
   ];
   return (
-    <MobileShell title="My profile" subtitle="Your workplace details">
+    <MobileShell title={t("profile.title")} subtitle={t("profile.subtitle")}>
+      <Panel>
+        <strong style={{ display: "block", marginBottom: 8 }}>{t("lang.label")}</strong>
+        <LanguagePicker />
+      </Panel>
       <Panel>
         <Hero>
           <span className="avatar">{initials(profile.name)}</span>
@@ -51,13 +58,9 @@ export function ProfilePage() {
         </Lines>
       </Panel>
       <Button variant="outlined" color="error" size="large" onClick={() => void signOut()}>
-        Sign out
+        {t("profile.signOut")}
       </Button>
-      <Note>
-        Your location is read only when you check in or out, and your selfie is saved with that
-        record under your workplace's privacy policy. Using someone else's phone? Sign out when you're
-        done.
-      </Note>
+      <Note>{t("profile.note")}</Note>
     </MobileShell>
   );
 }
