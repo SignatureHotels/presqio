@@ -1,5 +1,6 @@
 import { createContext } from "react";
 import type {
+  RegisterWithInvitationRequest,
   LoginRequest,
   MeResponse,
   OrganizationAccess,
@@ -18,6 +19,8 @@ export interface AuthState {
   register: (request: RegisterRequest) => Promise<MeResponse>;
   /** Signs a Presqio owner in with the one-tap link emailed to them. */
   ownerSignIn: (token: string) => Promise<MeResponse>;
+  /** Creates an account from an invitation (the invite link verifies the email) and signs in. */
+  registerInvited: (request: RegisterWithInvitationRequest) => Promise<MeResponse>;
   logout: () => Promise<void>;
   /** Re-reads memberships and onboarding progress after a change. */
   reload: () => Promise<MeResponse | null>;

@@ -7,6 +7,7 @@ import { DatabaseService } from "../../common/database/database.service";
 import type { OrganizationContext, RequestUser } from "../../common/auth/auth.types";
 import { dateOnly, localDate } from "../../common/time/zoned";
 import { AuditService } from "../audit/audit.service";
+import { employeesInScope, type BranchScope } from "../../common/auth/branch-scope";
 import type { CreateHolidayDto, CreateLeaveTypeDto, UpdateLeaveTypeDto } from "./dto/time-off.dto";
 
 type Db = DatabaseService | Prisma.TransactionClient;
@@ -119,13 +120,13 @@ export class TimeOffService {
     return new Map(rows.map((r) => [r.leave_type_id, r._count._all]));
   }
 
-  async balances(businessId: string, year?: number): Promise<LeaveBalancesResponse> {
+  async balances(businessId: string, year?: number, scope?: BranchScope): Promise<LeaveBalancesResponse> {
     const { timezone } = await this.db.businesses.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
     const y = year ?? Number(localDate(timezone).slice(0, 4));
     const [types, employees, counts] = await Promise.all([
       this.leaveTypes(businessId),
       this.db.employees.findMany({
-        where: { business_id: businessId, status: { not: "TERMINATED" } },
+        where: { business_id: businessId, status: { not: "TERMINATED" }, ...employeesInScope(scope) },
         orderBy: [{ full_name: "asc" }, { id: "asc" }], take: 1000,
         select: { id: true, employee_code: true, full_name: true },
       }),

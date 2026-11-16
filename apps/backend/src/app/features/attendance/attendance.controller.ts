@@ -18,7 +18,7 @@ export class AttendanceController {
 
   @Get("attendance/register")
   attendanceRegister(@CurrentBusiness() business: BusinessContext, @Query() query: AttendanceRegisterDto) {
-    return this.register.get(business.businessId, query);
+    return this.register.get(business.businessId, query, business.branchIds);
   }
 
   @Get("overview")
@@ -26,6 +26,6 @@ export class AttendanceController {
     @CurrentOrganization() org: OrganizationContext,
     @CurrentBusiness() business: BusinessContext,
   ): Promise<OverviewResponse> {
-    return this.attendance.overview(org.organizationId, business.businessId);
+    return this.attendance.overview(org.organizationId, business.businessId, business.branchIds);
   }
 }

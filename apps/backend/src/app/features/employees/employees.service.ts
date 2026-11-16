@@ -15,6 +15,7 @@ import { AttendanceService, type TodaySnapshot } from "../attendance/attendance.
 import { PhotoStorageService } from "../../common/storage/photo-storage.service";
 import { AuditService } from "../audit/audit.service";
 import { PayrollService } from "../payroll/payroll.service";
+import { assertBranchInScope, employeesInScope, type BranchScope } from "../../common/auth/branch-scope";
 import type { CreateEmployeeDto, UpdateEmployeeDto } from "./dto/employee.dto";
 
 const EMPLOYEE_INCLUDE = {
@@ -42,10 +43,10 @@ export class EmployeesService {
     private readonly payroll: PayrollService,
   ) {}
 
-  async list(businessId: string): Promise<EmployeeRecord[]> {
+  async list(businessId: string, scope?: BranchScope): Promise<EmployeeRecord[]> {
     const [rows, today] = await Promise.all([
       this.db.employees.findMany({
-        where: { business_id: businessId },
+        where: { business_id: businessId, ...employeesInScope(scope) },
         include: EMPLOYEE_INCLUDE,
         orderBy: [{ full_name: "asc" }],
       }),
@@ -59,8 +60,11 @@ export class EmployeesService {
     businessId: string,
     actor: RequestUser,
     dto: CreateEmployeeDto,
+    scope?: BranchScope,
   ): Promise<EmployeeRecord> {
     assertPayrollAccess(org, dto.payroll);
+    assertBranchInScope(scope, dto.branchId);
+    for (const id of dto.otherBranchIds ?? []) assertBranchInScope(scope, id);
     let employeeId: string;
     try {
       employeeId = await this.db.$transaction(async (tx) => {
@@ -142,12 +146,15 @@ export class EmployeesService {
     actor: RequestUser,
     employeeId: string,
     dto: UpdateEmployeeDto,
+    scope?: BranchScope,
   ): Promise<EmployeeRecord> {
     const before = await this.db.employees.findFirst({
-      where: { id: employeeId, business_id: businessId },
+      where: { id: employeeId, business_id: businessId, ...employeesInScope(scope) },
       include: EMPLOYEE_INCLUDE,
     });
     if (!before) throw new NotFoundException("Employee not found");
+    if (dto.branchId) assertBranchInScope(scope, dto.branchId);
+    for (const id of dto.otherBranchIds ?? []) assertBranchInScope(scope, id);
     assertPayrollAccess(org, dto.payroll);
     await this.db.$transaction(async (tx) => {
       const now = new Date();
@@ -237,7 +244,9 @@ export class EmployeesService {
   }
 
   /** A check-in/out selfie, for admins of this organization only. */
-  async photo(businessId: string, attemptId: string) {
+  async photo(businessId: string, attemptId: string, scope?: BranchScope) {
+    if (scope && !(await this.db.attendance_attempts.findFirst({ where: { id: attemptId, business_id: businessId, branch_id: { in: scope } }, select: { id: true } })))
+      throw new NotFoundException("Photo not found");
     const photo = await this.db.attendance_photos.findFirst({
       where: { business_id: businessId, attempt_id: attemptId },
       select: { content_type: true, data: true, storage_key: true },

@@ -21,6 +21,7 @@ import {
   ForgotPasswordDto,
   LoginDto,
   RegisterDto,
+  RegisterInvitedDto,
   ResetPasswordDto,
   VerifyEmailDto,
 } from "./dto/auth.dto";
@@ -46,6 +47,17 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthSessionResponse> {
     return this.withCookie(res, await this.auth.register(dto, client(req)));
+  }
+
+  @Public()
+  @Throttle(STRICT)
+  @Post("register-invited")
+  async registerInvited(
+    @Body() dto: RegisterInvitedDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthSessionResponse> {
+    return this.withCookie(res, await this.auth.registerInvited(dto, client(req)));
   }
 
   @Public()

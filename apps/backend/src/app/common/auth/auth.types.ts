@@ -19,6 +19,8 @@ export interface BusinessContext {
   businessId: string;
   /** The caller's business membership role; null when access comes from OWNER/ADMIN. */
   role: BusinessRole | null;
+  /** Branches a branch manager or viewer is limited to; null means every branch. */
+  branchIds: string[] | null;
 }
 /** The signed-in employee (mobile app sessions only). */
 export interface EmployeeContext {

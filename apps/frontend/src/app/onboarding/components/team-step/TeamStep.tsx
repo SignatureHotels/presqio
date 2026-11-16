@@ -4,7 +4,7 @@ import { errorMessage } from "@/api/client";
 import { Icon } from "@/components";
 import { StepFrame, StepList, StepListIcon } from "../step-frame";
 
-/** Invitations and employee import are not live yet; this step explains what comes next. */
+/** Explains how the team comes in: admins and managers by invitation (Team page), employees by ID. */
 export function TeamStep({
   onContinue,
   onBack,
@@ -42,7 +42,7 @@ export function TeamStep({
           <div>
             <strong>Invite admins and branch managers</strong>
             <span className="sm muted">
-              Give a manager access to only the branches they run.
+              From Team in the menu after setup. Give a manager access to only the branches they run.
             </span>
           </div>
         </li>

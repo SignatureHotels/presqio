@@ -4,6 +4,7 @@ import type { AttendanceRegisterResponse, RegisterDay, RegisterSession, Register
 import { DatabaseService } from "../../common/database/database.service";
 import { addDays, dateOnly, isoWeekday, localDate, localTime, minutesEarly, minutesOf, type ShiftSnapshot } from "../../common/time/zoned";
 import { rosterDays } from "../roster/roster-schedule";
+import { assertBranchInScope, employeesInScope, type BranchScope } from "../../common/auth/branch-scope";
 import type { AttendanceRegisterDto } from "./dto/attendance-register.dto";
 
 const PAGE_SIZE = 25;
@@ -53,7 +54,8 @@ export function registerDay(input: {
 export class AttendanceRegisterService {
   constructor(private readonly db: DatabaseService) {}
 
-  async get(businessId: string, query: AttendanceRegisterDto): Promise<AttendanceRegisterResponse> {
+  async get(businessId: string, query: AttendanceRegisterDto, scope?: BranchScope): Promise<AttendanceRegisterResponse> {
+    if (query.branchId) assertBranchInScope(scope, query.branchId);
     const dates = registerDates(query.from, query.to);
     const { timezone } = await this.db.businesses.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
     const today = localDate(timezone);
@@ -65,6 +67,7 @@ export class AttendanceRegisterService {
     `)[0] : null;
     const where: Prisma.employeesWhereInput = {
       business_id: businessId,
+      ...employeesInScope(scope),
       ...(query.search?.trim() && { OR: [
         { full_name: { contains: query.search.trim(), mode: "insensitive" } },
         { employee_code: { contains: query.search.trim(), mode: "insensitive" } },
@@ -86,7 +89,8 @@ export class AttendanceRegisterService {
     const employeeIds = employees.map((e) => e.id);
     const [sessions, leaves, assignments, holidays] = await Promise.all([
       this.db.attendance_sessions.findMany({
-        where: { business_id: businessId, employee_id: { in: employeeIds }, work_date: range, ...(query.branchId && { branch_id: query.branchId }) },
+        where: { business_id: businessId, employee_id: { in: employeeIds }, work_date: range,
+          ...(query.branchId ? { branch_id: query.branchId } : scope ? { branch_id: { in: scope } } : {}) },
         orderBy: { opened_at: "asc" },
         include: { branch_id_ref: { select: { name: true } }, attendance_events_session_id_rows: {
           orderBy: { occurred_at: "asc" }, select: { type: true, attempt_id: true },

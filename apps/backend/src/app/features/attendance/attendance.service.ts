@@ -10,6 +10,7 @@ import type {
 } from "@presqio/lib";
 import { DatabaseService } from "../../common/database/database.service";
 import { rosterDays } from "../roster/roster-schedule";
+import { assertBranchInScope, employeesInScope, type BranchScope } from "../../common/auth/branch-scope";
 import {
   addDays,
   dateOnly,
@@ -191,13 +192,13 @@ export class AttendanceService {
     };
   }
 
-  async overview(organizationId: string, businessId: string): Promise<OverviewResponse> {
+  async overview(organizationId: string, businessId: string, scope?: BranchScope): Promise<OverviewResponse> {
     const timezone = await this.timezoneOf(businessId);
     const date = localDate(timezone);
     const from = addDays(date, -(HISTORY_DAYS - 1));
     const [employees, branches, sessions, today, logs, leaves] = await Promise.all([
       this.db.employees.findMany({
-        where: { business_id: businessId, status: { in: ["PENDING", "ACTIVE"] } },
+        where: { business_id: businessId, status: { in: ["PENDING", "ACTIVE"] }, ...employeesInScope(scope) },
         select: {
           id: true,
           created_at: true,
@@ -208,7 +209,7 @@ export class AttendanceService {
         },
       }),
       this.db.branches.findMany({
-        where: { business_id: businessId, status: "ACTIVE" },
+        where: { business_id: businessId, status: "ACTIVE", ...(scope && { id: { in: scope } }) },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       }),
@@ -298,7 +299,8 @@ export class AttendanceService {
       };
     });
 
-    return { date, timezone, summary, days, branches: branchStats, activity: logs };
+    // the organization's activity log (payroll, settings, team) is for owners and admins
+    return { date, timezone, summary, days, branches: branchStats, activity: scope ? [] : logs };
   }
 
   /** Latest admin changes, phrased for people. */

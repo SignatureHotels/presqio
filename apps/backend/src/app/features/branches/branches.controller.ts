@@ -26,7 +26,7 @@ export class BranchesController {
 
   @Get()
   list(@CurrentBusiness() business: BusinessContext): Promise<BranchRecord[]> {
-    return this.branches.list(business.businessId);
+    return this.branches.list(business.businessId, undefined, business.branchIds);
   }
 
   @BusinessRoles("BUSINESS_ADMIN")

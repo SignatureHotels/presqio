@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { initials } from "@/utils/format";
 import { Icon } from "@/components";
 import { adminNavigation } from "@/router/admin-navigation";
+import { accessIn, allowed } from "@/utils/access";
 import {
   Aside,
   Badge,
@@ -27,7 +28,9 @@ export function Sidebar({ loading = false }: { loading?: boolean }) {
     (approval) => approval.status === "Pending",
   );
   function navigation(items: typeof adminNavigation) {
-    return items.filter(item => item.path !== "payroll" || loading || auth.activeOrganization?.role === "OWNER" || auth.activeOrganization?.role === "ADMIN").map((item) => (
+    // each person sees the pages for what they can do (all while loading)
+    const access = loading ? null : accessIn(auth.activeOrganization);
+    return items.filter((item) => allowed(item.only, access)).map((item) => (
       <SideItem
         key={item.path}
         to={`/admin/${item.path}`}

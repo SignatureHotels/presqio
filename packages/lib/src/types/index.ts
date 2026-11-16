@@ -14,3 +14,4 @@ export type * from "./owner";
 export type * from "./time-off";
 export type * from "./roster";
 export type * from "./kiosk";
+export type * from "./team";

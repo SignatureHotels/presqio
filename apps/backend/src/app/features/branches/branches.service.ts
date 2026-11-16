@@ -6,6 +6,7 @@ import type { OrganizationContext, RequestUser } from "../../common/auth/auth.ty
 import { DatabaseService } from "../../common/database/database.service";
 import { randomSuffix, slugify } from "../../common/security/tokens";
 import { AuditService } from "../audit/audit.service";
+import type { BranchScope } from "../../common/auth/branch-scope";
 import type { CreateBranchDto, UpdateBranchDto } from "./dto/branch.dto";
 
 interface BranchRow {
@@ -28,7 +29,7 @@ export class BranchesService {
   ) {}
 
   /** Active branches with their current perimeter (PostGIS point read back as lat/lng). */
-  async list(businessId: string, branchId?: string): Promise<BranchRecord[]> {
+  async list(businessId: string, branchId?: string, scope?: BranchScope): Promise<BranchRecord[]> {
     const rows = await this.db.$queryRaw<BranchRow[]>`
       SELECT b.id, b.business_id, b.code, b.name, b.address,
              ST_Y(g.center::geometry) AS latitude, ST_X(g.center::geometry) AS longitude,
@@ -42,7 +43,8 @@ export class BranchesService {
        WHERE b.business_id = ${businessId}::uuid AND b.status = 'ACTIVE'
          ${branchId ? Prisma.sql`AND b.id = ${branchId}::uuid` : Prisma.empty}
        ORDER BY b.name`;
-    return rows.map((r) => ({
+    // a branch manager sees only their branches
+    return rows.filter((r) => !scope || scope.includes(r.id)).map((r) => ({
       id: r.id,
       businessId: r.business_id,
       code: r.code,

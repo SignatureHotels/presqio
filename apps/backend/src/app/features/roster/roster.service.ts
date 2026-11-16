@@ -7,6 +7,7 @@ import { AuditService } from "../audit/audit.service";
 import { registerDates } from "../attendance/attendance-register.service";
 import { toRecord } from "../shifts/shifts.service";
 import type { RosterQueryDto, SaveRosterDto } from "./dto/roster.dto";
+import { assertBranchInScope, employeesInScope, type BranchScope } from "../../common/auth/branch-scope";
 import { rosterDays } from "./roster-schedule";
 
 const MAX_EMPLOYEES = 500;
@@ -19,7 +20,8 @@ export class RosterService {
     private readonly audit: AuditService,
   ) {}
 
-  async get(businessId: string, query: RosterQueryDto): Promise<RosterResponse> {
+  async get(businessId: string, query: RosterQueryDto, scope?: BranchScope): Promise<RosterResponse> {
+    if (query.branchId) assertBranchInScope(scope, query.branchId);
     const dates = registerDates(query.from, query.to);
     const [shifts, employees, holidays] = await Promise.all([
       this.db.shifts.findMany({ where: { business_id: businessId }, orderBy: [{ starts_local: "asc" }, { name: "asc" }] }),
@@ -27,6 +29,7 @@ export class RosterService {
         where: {
           business_id: businessId,
           status: { not: "TERMINATED" },
+          ...employeesInScope(scope),
           ...(query.branchId && { employee_branch_assignments_employee_id_rows: { some: { branch_id: query.branchId, effective_to: null } } }),
         },
         orderBy: [{ full_name: "asc" }, { id: "asc" }],
@@ -64,7 +67,7 @@ export class RosterService {
   }
 
   /** Replaces the given people's days; a change with no shifts and not off returns the day to the usual shift. */
-  async save(org: OrganizationContext, businessId: string, actor: RequestUser, dto: SaveRosterDto): Promise<{ saved: number }> {
+  async save(org: OrganizationContext, businessId: string, actor: RequestUser, dto: SaveRosterDto, scope?: BranchScope): Promise<{ saved: number }> {
     // the last change for a person and date wins
     const changes = [...new Map(dto.changes.map((c) => [`${c.employeeId}:${c.date}`, c])).values()];
     for (const c of changes) {
@@ -75,7 +78,7 @@ export class RosterService {
     const employeeIds = [...new Set(changes.map((c) => c.employeeId))];
     const shiftIds = [...new Set(changes.flatMap((c) => c.shiftIds))];
     const [employees, shifts] = await Promise.all([
-      this.db.employees.count({ where: { business_id: businessId, id: { in: employeeIds } } }),
+      this.db.employees.count({ where: { business_id: businessId, id: { in: employeeIds }, ...employeesInScope(scope) } }),
       this.db.shifts.count({ where: { business_id: businessId, id: { in: shiftIds } } }),
     ]);
     if (employees !== employeeIds.length) throw new BadRequestException("One of these employees isn't in this business.");

@@ -73,6 +73,20 @@ ${body}${button}
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || "there";
 
 export const mailTemplates = {
+  /** To someone invited to help run a workspace. */
+  invitation: (input: { inviter: string; organizationName: string; access: string; branches: string; acceptUrl: string }) =>
+    layout({
+      subject: `${input.inviter} invited you to ${input.organizationName} on Presqio`,
+      preheader: `Join ${input.organizationName} as ${input.access}.`,
+      heading: `Join ${input.organizationName}`,
+      paragraphs: [
+        `${input.inviter} invited you to help run ${input.organizationName} on Presqio, as ${input.access}${input.branches ? ` for ${input.branches}` : ""}.`,
+        "Presqio records staff check-ins with a selfie at the workplace, and handles leave, rosters and payroll.",
+      ],
+      action: { label: "Accept invitation", url: input.acceptUrl },
+      footnote: "This invitation expires in 7 days. If you weren't expecting it, you can ignore this email.",
+    }),
+
   welcome: (input: { name: string; organizationName: string; verifyUrl: string }) =>
     layout({
       subject: "Welcome to Presqio – please verify your email",

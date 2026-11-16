@@ -11,6 +11,7 @@ const RegisterPage = lazyPage(() => import("@/app/auth/register/RegisterPage"), 
 const ForgotPasswordPage = lazyPage(() => import("@/app/auth/forgot-password/ForgotPasswordPage"), "ForgotPasswordPage");
 const ResetPasswordPage = lazyPage(() => import("@/app/auth/reset-password/ResetPasswordPage"), "ResetPasswordPage");
 const VerifyEmailPage = lazyPage(() => import("@/app/auth/verify-email/VerifyEmailPage"), "VerifyEmailPage");
+const InvitePage = lazyPage(() => import("@/app/auth/invite/InvitePage"), "InvitePage");
 const SelectOrganizationPage = lazyPage(() => import("@/app/select-organization"), "SelectOrganizationPage");
 const OnboardingPage = lazyPage(() => import("@/app/onboarding"), "OnboardingPage");
 const AdminWorkspace = lazyPage(() => import("@/app/admin/AdminWorkspace"), "default");
@@ -32,6 +33,8 @@ export function AppRouter() {
       <Route path="/forgot-password" element={<Suspense fallback={pageFallback}><ForgotPasswordPage /></Suspense>} />
       <Route path="/reset-password" element={<Suspense fallback={pageFallback}><ResetPasswordPage /></Suspense>} />
       <Route path="/verify-email" element={<Suspense fallback={pageFallback}><VerifyEmailPage /></Suspense>} />
+      {/* An invitation link from email: works signed in or not. */}
+      <Route path="/invite" element={<Suspense fallback={pageFallback}><InvitePage /></Suspense>} />
       <Route
         path="/select-organization"
         element={<Suspense fallback={pageFallback}><RequireAuth><SelectOrganizationPage /></RequireAuth></Suspense>}

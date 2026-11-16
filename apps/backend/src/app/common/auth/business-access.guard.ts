@@ -40,12 +40,13 @@ export class BusinessAccessGuard implements CanActivate {
       select: {
         business_memberships_business_id_rows: {
           where: { user_id: request.user!.userId },
-          select: { role: true },
+          select: { role: true, branch_scope_rows: { select: { branch_id: true } } },
         },
       },
     });
     if (!business) throw new NotFoundException("Business not found");
-    const role = business.business_memberships_business_id_rows[0]?.role ?? null;
+    const membership = business.business_memberships_business_id_rows[0];
+    const role = membership?.role ?? null;
     if (organization.role === "MEMBER") {
       if (!role) throw new NotFoundException("Business not found");
       const allowed = this.reflector.getAllAndOverride<BusinessRole[] | undefined>(
@@ -55,7 +56,9 @@ export class BusinessAccessGuard implements CanActivate {
       if (allowed && !allowed.includes(role))
         throw new ForbiddenException("Your role cannot perform this action");
     }
-    request.business = { businessId, role };
+    // Owners and admins see every branch; a member's branch rows (if any) limit what they see.
+    const branches = organization.role === "MEMBER" ? membership?.branch_scope_rows.map((b) => b.branch_id) ?? [] : [];
+    request.business = { businessId, role, branchIds: branches.length ? branches : null };
     return true;
   }
 }

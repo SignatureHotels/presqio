@@ -84,7 +84,7 @@ test("owner sign-in links go only to listed owners, creating the account on firs
     link: (path: string, token: string) => `https://presqio.pages.dev${path}?token=${token}`,
   };
   const config = { get: (key: string) => (key === "PLATFORM_OWNER_EMAILS" ? "presqio.team@gmail.com" : undefined) };
-  const auth = new AuthService(db as never, {} as never, {} as never, mail as never, {} as never, config as never);
+  const auth = new AuthService(db as never, {} as never, {} as never, mail as never, {} as never, config as never, {} as never);
 
   await auth.ownerSignInLink("someone@hotel.in");
   assert.equal(created.length, 0);

@@ -2,6 +2,9 @@ import { Suspense, useEffect } from "react";
 import { Skeleton } from "@mui/material";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import type { Employee } from "@/types/admin-preview";
+import { useAuth } from "@/hooks/use-auth";
+import { accessIn, allowed } from "@/utils/access";
+import { adminNavigation } from "./admin-navigation";
 import { lazyPage, preloadWhenIdle } from "./lazy-page";
 
 // Each admin page is its own chunk; all are prefetched when idle so moving between pages stays instant.
@@ -16,13 +19,18 @@ const ApprovalsPage = lazyPage(() => import("@/app/admin/approvals"), "Approvals
 const ReportsPage = lazyPage(() => import("@/app/admin/reports"), "ReportsPage");
 const SettingsPage = lazyPage(() => import("@/app/admin/settings"), "SettingsPage");
 const PayrollPage = lazyPage(() => import("@/app/admin/payroll/PayrollPage"), "default");
-const PAGES = [OverviewPage, EmployeesPage, AttendancePage, BranchesPage, ShiftsPage, RosterPage, TimeOffPage, ApprovalsPage, ReportsPage, SettingsPage, PayrollPage];
+const TeamPage = lazyPage(() => import("@/app/admin/team"), "TeamPage");
+const PAGES = [OverviewPage, EmployeesPage, AttendancePage, BranchesPage, ShiftsPage, RosterPage, TimeOffPage, ApprovalsPage, ReportsPage, SettingsPage, PayrollPage, TeamPage];
 export function AdminRoutes({
   onView,
 }: {
   onView: (employee: Employee) => void;
 }) {
   useEffect(() => preloadWhenIdle(PAGES), []);
+  const access = accessIn(useAuth().activeOrganization);
+  /** A page someone can't use sends them to the overview (the server refuses its data anyway). */
+  const gate = (path: string, page: React.ReactNode) =>
+    allowed(adminNavigation.find((item) => item.path === path)?.only, access) ? page : <Navigate to="/admin/overview" replace />;
   return (
     <Suspense fallback={<Skeleton variant="rounded" height={260} />}>
     <Routes>
@@ -40,18 +48,19 @@ export function AdminRoutes({
         path="attendance/history"
         element={<Navigate to="/admin/attendance/live" replace />}
       />
-      <Route path="branches" element={<BranchesPage />} />
-      <Route path="shifts" element={<ShiftsPage />} />
+      <Route path="branches" element={gate("branches", <BranchesPage />)} />
+      <Route path="shifts" element={gate("shifts", <ShiftsPage />)} />
       <Route path="roster" element={<RosterPage />} />
-      <Route path="time-off" element={<TimeOffPage />} />
-      <Route path="corrections" element={<ApprovalsPage />} />
+      <Route path="time-off" element={gate("time-off", <TimeOffPage />)} />
+      <Route path="corrections" element={gate("corrections", <ApprovalsPage />)} />
       <Route
         path="approvals"
         element={<Navigate to="/admin/corrections" replace />}
       />
-      <Route path="payroll" element={<PayrollPage />} />
-      <Route path="reports" element={<ReportsPage />} />
-      <Route path="settings" element={<SettingsPage />} />
+      <Route path="payroll" element={gate("payroll", <PayrollPage />)} />
+      <Route path="reports" element={gate("reports", <ReportsPage />)} />
+      <Route path="team" element={gate("team", <TeamPage />)} />
+      <Route path="settings" element={gate("settings", <SettingsPage />)} />
       <Route
         path="*"
         element={

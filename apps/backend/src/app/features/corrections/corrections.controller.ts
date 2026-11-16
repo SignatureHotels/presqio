@@ -26,7 +26,7 @@ export class CorrectionsController {
 
   @Get()
   list(@CurrentBusiness() business: BusinessContext): Promise<Approval[]> {
-    return this.corrections.list(business.businessId);
+    return this.corrections.list(business.businessId, business.branchIds);
   }
 
   @BusinessRoles("BUSINESS_ADMIN", "BRANCH_MANAGER")
@@ -38,6 +38,6 @@ export class CorrectionsController {
     @Param("correctionId", ParseUUIDPipe) correctionId: string,
     @Body() dto: DecideCorrectionDto,
   ): Promise<Approval> {
-    return this.corrections.decide(org, business.businessId, user, correctionId, dto);
+    return this.corrections.decide(org, business.businessId, user, correctionId, dto, business.branchIds);
   }
 }

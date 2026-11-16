@@ -20,6 +20,7 @@ import { ShiftsModule } from "./features/shifts/shifts.module";
 import { TimeOffModule } from "./features/time-off/time-off.module";
 import { RosterModule } from "./features/roster/roster.module";
 import { KiosksModule } from "./features/kiosks/kiosks.module";
+import { TeamModule } from "./features/team/team.module";
 import { AttendanceModule } from "./features/attendance/attendance.module";
 import { CorrectionsModule } from "./features/corrections/corrections.module";
 import { ReportsModule } from "./features/reports/reports.module";
@@ -49,6 +50,7 @@ import { OwnerModule } from "./features/owner/owner.module";
     TimeOffModule,
     RosterModule,
     KiosksModule,
+    TeamModule,
     AttendanceModule,
     CorrectionsModule,
     ReportsModule,

@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import type {
+  RegisterWithInvitationRequest,
   ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
@@ -58,4 +59,11 @@ export class ResetPasswordDto implements ResetPasswordRequest {
 
 export class VerifyEmailDto implements VerifyEmailRequest {
   @ApiProperty() @IsString() @Length(20, 200) token!: string;
+}
+
+/** Creating an account from an invitation: the invitation's email is used (and is verified by the link). */
+export class RegisterInvitedDto implements RegisterWithInvitationRequest {
+  @ApiProperty() @IsString() @Length(20, 200) token!: string;
+  @ApiProperty({ example: "Ravi Kumar" }) @Transform(trim) @IsString() @Length(2, 80) fullName!: string;
+  @ApiProperty() @IsString() @Length(PASSWORD_MIN, PASSWORD_MAX) password!: string;
 }

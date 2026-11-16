@@ -65,6 +65,6 @@ export class TimeOffController {
 
   @Get("balances")
   balances(@CurrentBusiness() business: BusinessContext, @Query() query: YearQueryDto): Promise<LeaveBalancesResponse> {
-    return this.timeOff.balances(business.businessId, query.year);
+    return this.timeOff.balances(business.businessId, query.year, business.branchIds);
   }
 }

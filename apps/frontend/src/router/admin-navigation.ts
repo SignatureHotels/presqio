@@ -1,4 +1,8 @@
-export const adminNavigation = [
+import type { TeamAccess } from "@presqio/lib";
+import { ADMINS, RUNS_BRANCHES } from "@/utils/access";
+
+/** `only`: who sees the page (everyone when absent). */
+export const adminNavigation: { path: string; title: string; icon: string; heading: string; description: string; only?: TeamAccess[] }[] = [
   {
     path: "overview",
     title: "Overview",
@@ -22,6 +26,7 @@ export const adminNavigation = [
   },
   {
     path: "branches",
+    only: ADMINS,
     title: "Branches & geofences",
     icon: "map",
     heading: "Branches & geofences",
@@ -29,6 +34,7 @@ export const adminNavigation = [
   },
   {
     path: "shifts",
+    only: ADMINS,
     title: "Shifts & policies",
     icon: "calendar",
     heading: "Shifts & policies",
@@ -43,6 +49,7 @@ export const adminNavigation = [
   },
   {
     path: "time-off",
+    only: ADMINS,
     title: "Holidays & leave",
     icon: "calendar",
     heading: "Holidays & leave",
@@ -50,6 +57,7 @@ export const adminNavigation = [
   },
   {
     path: "corrections",
+    only: RUNS_BRANCHES,
     title: "Approvals",
     icon: "shield",
     heading: "Pending approvals",
@@ -57,6 +65,7 @@ export const adminNavigation = [
   },
   {
     path: "payroll",
+    only: ADMINS,
     title: "Payroll",
     icon: "file",
     heading: "Payroll",
@@ -64,13 +73,23 @@ export const adminNavigation = [
   },
   {
     path: "reports",
+    only: ADMINS,
     title: "Reports",
     icon: "report",
     heading: "Reports & analytics",
     description: "Attendance reports, dated in/out records, selfies and CSV exports.",
   },
   {
+    path: "team",
+    only: ADMINS,
+    title: "Team",
+    icon: "users",
+    heading: "Team",
+    description: "Invite admins and branch managers, and choose what each person can see.",
+  },
+  {
     path: "settings",
+    only: ADMINS,
     title: "Settings",
     icon: "settings",
     heading: "Workspace settings",

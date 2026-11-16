@@ -38,7 +38,7 @@ export class EmployeesController {
 
   @Get()
   list(@CurrentBusiness() business: BusinessContext): Promise<EmployeeRecord[]> {
-    return this.employees.list(business.businessId);
+    return this.employees.list(business.businessId, business.branchIds);
   }
 
   @BusinessRoles("BUSINESS_ADMIN", "BRANCH_MANAGER")
@@ -49,7 +49,7 @@ export class EmployeesController {
     @CurrentUser() user: RequestUser,
     @Body() dto: CreateEmployeeDto,
   ): Promise<EmployeeRecord> {
-    return this.employees.create(org, business.businessId, user, dto);
+    return this.employees.create(org, business.businessId, user, dto, business.branchIds);
   }
 
   @BusinessRoles("BUSINESS_ADMIN", "BRANCH_MANAGER")
@@ -61,7 +61,7 @@ export class EmployeesController {
     @Param("employeeId", ParseUUIDPipe) employeeId: string,
     @Body() dto: UpdateEmployeeDto,
   ): Promise<EmployeeRecord> {
-    return this.employees.update(org, business.businessId, user, employeeId, dto);
+    return this.employees.update(org, business.businessId, user, employeeId, dto, business.branchIds);
   }
 
   /** Check-in/out selfie (image bytes). Never cached: it is personal evidence. */
@@ -72,7 +72,7 @@ export class EmployeesController {
     @Param("attemptId", ParseUUIDPipe) attemptId: string,
     @Res() res: Response,
   ) {
-    const photo = await this.employees.photo(business.businessId, attemptId);
+    const photo = await this.employees.photo(business.businessId, attemptId, business.branchIds);
     res.type(photo.contentType).send(Buffer.from(photo.data));
   }
 }

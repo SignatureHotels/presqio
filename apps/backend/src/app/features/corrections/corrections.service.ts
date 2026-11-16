@@ -4,6 +4,7 @@ import type { Approval, ReviewStatus } from "@presqio/lib";
 import type { OrganizationContext, RequestUser } from "../../common/auth/auth.types";
 import { DatabaseService } from "../../common/database/database.service";
 import { AuditService } from "../audit/audit.service";
+import { assertBranchInScope, employeesInScope, type BranchScope } from "../../common/auth/branch-scope";
 import type { DecideCorrectionDto } from "./dto/decide-correction.dto";
 
 const STATUS: Record<"PENDING" | "APPROVED" | "REJECTED", ReviewStatus> = {
@@ -20,9 +21,9 @@ export class CorrectionsService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(businessId: string): Promise<Approval[]> {
+  async list(businessId: string, scope?: BranchScope): Promise<Approval[]> {
     const rows = await this.db.attendance_corrections.findMany({
-      where: { business_id: businessId },
+      where: { business_id: businessId, ...(scope && { session_id_ref: { branch_id: { in: scope } } }) },
       orderBy: { created_at: "desc" },
       take: 200,
       include: {
@@ -53,12 +54,13 @@ export class CorrectionsService {
     actor: RequestUser,
     correctionId: string,
     dto: DecideCorrectionDto,
+    scope?: BranchScope,
   ) {
     const decision = dto.decision === "Approved" ? "APPROVED" : "REJECTED";
     await this.db.$transaction(async (tx) => {
       // Only a still-pending request can be decided, and only once.
       const updated = await tx.attendance_corrections.updateMany({
-        where: { id: correctionId, business_id: businessId, status: "PENDING" },
+        where: { id: correctionId, business_id: businessId, status: "PENDING", ...(scope && { session_id_ref: { branch_id: { in: scope } } }) },
         data: { status: decision, reviewer_id: actor.userId, reviewed_at: new Date() },
       });
       if (updated.count !== 1) {

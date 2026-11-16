@@ -17,15 +17,15 @@ export class RosterController {
 
   @Get()
   get(@CurrentBusiness() business: BusinessContext, @Query() query: RosterQueryDto): Promise<RosterResponse> {
-    return this.roster.get(business.businessId, query);
+    return this.roster.get(business.businessId, query, business.branchIds);
   }
 
-  @BusinessRoles("BUSINESS_ADMIN")
+  @BusinessRoles("BUSINESS_ADMIN", "BRANCH_MANAGER")
   @Put()
   save(
     @CurrentOrganization() org: OrganizationContext, @CurrentBusiness() business: BusinessContext,
     @CurrentUser() user: RequestUser, @Body() dto: SaveRosterDto,
   ): Promise<{ saved: number }> {
-    return this.roster.save(org, business.businessId, user, dto);
+    return this.roster.save(org, business.businessId, user, dto, business.branchIds);
   }
 }

@@ -1,4 +1,5 @@
 import type {
+  RegisterWithInvitationRequest,
   AccessibleBusiness,
   AttendanceRegisterResponse,
   Approval,
@@ -40,6 +41,8 @@ export const authApi = {
     api<void>("/auth/owner/sign-in-link", { method: "POST", body: { email } }),
   ownerSignIn: (token: string) =>
     api<AuthSessionResponse>("/auth/owner/sign-in", { method: "POST", body: { token } }),
+  registerInvited: (body: RegisterWithInvitationRequest) =>
+    api<AuthSessionResponse>("/auth/register-invited", { method: "POST", body }),
   resetPassword: (token: string, password: string) =>
     api<void>("/auth/reset-password", {
       method: "POST",

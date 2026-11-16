@@ -21,9 +21,10 @@ import { SessionsService, type ClientInfo } from "../../common/auth/sessions.ser
 import { isPlatformOwner, platformOwnerEmails } from "../../common/auth/platform-owner.guard";
 import { ConfigService } from "@nestjs/config";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { TeamService } from "../team/team.service";
 
 export type { ClientInfo };
-import type { RegisterDto } from "./dto/auth.dto";
+import type { RegisterDto, RegisterInvitedDto } from "./dto/auth.dto";
 import { passwordProblem } from "./password-policy";
 import { asBusinessType } from "../organizations/dto/organization.dto";
 import { PasswordService } from "./password.service";
@@ -51,7 +52,30 @@ export class AuthService {
     private readonly mail: MailService,
     private readonly organizations: OrganizationsService,
     private readonly config: ConfigService,
+    private readonly team: TeamService,
   ) {}
+
+  /** A new account for someone invited to a workspace; the invitation's link proves the email. */
+  async registerInvited(dto: RegisterInvitedDto, client: ClientInfo): Promise<IssuedSession> {
+    const invitation = await this.team.byToken(dto.token);
+    const problem = passwordProblem(dto.password, { email: invitation.email, name: dto.fullName });
+    if (problem) throw new BadRequestException(problem);
+    const passwordHash = await this.passwords.hash(dto.password);
+    let userId: string;
+    try {
+      userId = await this.db.$transaction(async (tx) => {
+        const user = await tx.users.create({ data: { display_name: dto.fullName, email: invitation.email, email_verified_at: new Date() } });
+        await tx.credentials.create({ data: { user_id: user.id, password_hash: passwordHash } });
+        await this.team.join(tx, invitation, user.id);
+        return user.id;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && String(error.meta?.target ?? "").includes("email"))
+        throw new ConflictException("You already have a Presqio account. Sign in to accept the invitation.");
+      throw error;
+    }
+    return this.issueSession(userId, client);
+  }
 
   async register(dto: RegisterDto, client: ClientInfo): Promise<IssuedSession> {
     const email = normalizeEmail(dto.email);
