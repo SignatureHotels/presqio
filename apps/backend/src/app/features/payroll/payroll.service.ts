@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { EmployeePayrollDetails, PayrollCompensation, PayrollPreview, PayrollProfile, PayrollLine, PayrollSettings, PayrollRun, PayrollReview, PayrollSnapshot, PayrollSetup } from '@presqio/lib';
+import type { EmployeePayrollDetails, PayBasis, PayrollCompensation, PayrollPreview, PayrollProfile, PayrollLine, PayrollSettings, PayrollRun, PayrollReview, PayrollSnapshot, PayrollSetup } from '@presqio/lib';
 import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../../common/database/database.service';
 import { PhotoStorageService } from '../../common/storage/photo-storage.service';
@@ -22,8 +22,15 @@ const toProfile = (row: ProfileRow | null | undefined): PayrollProfile => row ? 
   department:row.department,dateOfBirth:row.date_of_birth ? date(row.date_of_birth):'',pan:row.pan,uan:row.uan,esi:row.esi,
   bankName:row.bank_name,bankAccount:row.bank_account,bankIfsc:row.bank_ifsc,bankBranch:row.bank_branch,lastWorkingDate:row.last_working_date ? date(row.last_working_date):'',
 } : EMPTY_PROFILE;
-const toCompensation = (r: Prisma.payroll_compensationsGetPayload<object>): PayrollCompensation => ({id:r.id,employeeId:r.employee_id,effectiveMonth:month(r.effective_month),
-  earnings:r.earnings_json as unknown as PayrollLine[],deductions:r.deductions_json as unknown as PayrollLine[]});
+type CompensationRow = Prisma.payroll_compensationsGetPayload<object>;
+/** How a salary version is paid. */
+const termsOf = (r: CompensationRow) => ({payBasis:r.pay_basis as PayBasis,rate:r.rate === null ? null : Number(r.rate),
+  standardDayMinutes:r.standard_day_min,overtimePercent:r.overtime_pct});
+/** The pay terms as hashed: absent for a monthly salary with no overtime, so older drafts keep their fingerprint. */
+export const termsSource = (r: CompensationRow) =>
+  r.pay_basis === 'MONTHLY' && r.overtime_pct === null ? {} : {pay:termsOf(r)};
+const toCompensation = (r: CompensationRow): PayrollCompensation => ({id:r.id,employeeId:r.employee_id,effectiveMonth:month(r.effective_month),
+  earnings:r.earnings_json as unknown as PayrollLine[],deductions:r.deductions_json as unknown as PayrollLine[],...termsOf(r)});
 
 @Injectable()
 export class PayrollService {
@@ -103,8 +110,12 @@ export class PayrollService {
   }
   private async saveSalary(tx:Tx,orgId:string,businessId:string,actor:string,employeeId:string,dto:PayrollSalaryDto) {
     monthBounds(dto.effectiveMonth); checkLines(dto.earnings); checkLines(dto.deductions);
+    const basis = dto.payBasis ?? 'MONTHLY';
+    if (basis === 'MONTHLY' && !dto.earnings.length) throw new BadRequestException('Add at least one salary component.');
+    if (basis !== 'MONTHLY' && !dto.rate) throw new BadRequestException(`Enter the ${basis === 'DAILY' ? 'daily' : 'hourly'} wage.`);
     const key = {business_id:businessId,employee_id:employeeId,effective_month:dateOnly(`${dto.effectiveMonth}-01`)};
-    const data = {earnings_json:json(dto.earnings),deductions_json:json(dto.deductions)};
+    const data = {earnings_json:json(dto.earnings),deductions_json:json(dto.deductions),pay_basis:basis,
+      rate:basis === 'MONTHLY' ? null : BigInt(dto.rate!),standard_day_min:dto.standardDayMinutes ?? 480,overtime_pct:dto.overtimePercent ?? null};
     const row = await tx.payroll_compensations.upsert({where:{business_id_employee_id_effective_month:key},create:{...key,...data,created_by:actor},update:data});
     await this.audit.record({organizationId:orgId,businessId,actorId:actor,objectType:'payroll_compensation',objectId:row.id,action:'updated'},tx);
     return {id:row.id};
@@ -158,12 +169,12 @@ export class PayrollService {
       const joinedOn = e.joined_on ? date(e.joined_on):localDate(business.timezone,e.created_at);
       // Only inputs that change pay; editing names, company or bank details must not undo a review.
       const source = {period:window,employee:{joinedOn,status:e.status,lastWorkingDate:profile.lastWorkingDate},
-        compensation:c ? {id:c.id,earnings:c.earnings_json,deductions:c.deductions_json}:null,
+        compensation:c ? {id:c.id,earnings:c.earnings_json,deductions:c.deductions_json,...termsSource(c)}:null,
         sessions:employeeSessions,leaves:leaveSource,assignments:employeeAssignments,corrections:employeeCorrections,
         ...(holidays.length ? {holidays} : {})};
       return calculatePayroll({month:payMonth,today,company,period:window,
         employee:{id:e.id,code:e.employee_code,name:e.full_name,designation:e.job_title ?? '',joinedOn,status:e.status},
-        compensation:c ? {id:c.id,earnings:c.earnings_json as unknown as PayrollLine[],deductions:c.deductions_json as unknown as PayrollLine[]}:null,profile,
+        compensation:c ? {id:c.id,earnings:c.earnings_json as unknown as PayrollLine[],deductions:c.deductions_json as unknown as PayrollLine[],...termsOf(c)}:null,profile,
         sessions:employeeSessions.map(s => ({id:s.id,date:date(s.work_date),openedAt:s.opened_at.toISOString(),closedAt:s.closed_at?.toISOString() ?? null})),
         leaves:employeeLeaves.filter(l => !l.leave_type_id).map(l => date(l.leave_date)),
         paidLeaves:employeeLeaves.filter(l => l.leave_type_ref?.paid===true).map(l => date(l.leave_date)),

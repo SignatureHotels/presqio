@@ -1,5 +1,6 @@
 import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
 import type {
+  BusinessType,
   CreateOrganizationRequest,
   OnboardingStep,
   UpdateOrganizationRequest,
@@ -28,6 +29,11 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   "COMPLETED",
 ];
 
+export const BUSINESS_TYPES: BusinessType[] = [
+  "office", "retail", "restaurant", "clinic", "factory", "construction",
+  "security", "school", "salon", "field", "other",
+];
+
 export class CreateOrganizationDto implements CreateOrganizationRequest {
   @ApiProperty() @Transform(trim) @IsString() @Length(2, 80) name!: string;
   @ApiPropertyOptional({ example: "IN" })
@@ -36,6 +42,9 @@ export class CreateOrganizationDto implements CreateOrganizationRequest {
   @ApiPropertyOptional({ example: "Asia/Kolkata" })
   @IsOptional() @IsTimeZone()
   defaultTimezone?: string;
+  @ApiPropertyOptional({ enum: BUSINESS_TYPES })
+  @IsOptional() @IsIn(BUSINESS_TYPES)
+  businessType?: BusinessType;
 }
 
 export class UpdateOrganizationDto implements UpdateOrganizationRequest {
@@ -45,7 +54,15 @@ export class UpdateOrganizationDto implements UpdateOrganizationRequest {
   country?: string;
   @ApiPropertyOptional() @IsOptional() @IsTimeZone()
   defaultTimezone?: string;
+  @ApiPropertyOptional({ enum: BUSINESS_TYPES })
+  @IsOptional() @IsIn(BUSINESS_TYPES)
+  businessType?: BusinessType;
   @ApiPropertyOptional({ enum: ONBOARDING_STEPS })
   @IsOptional() @IsIn(ONBOARDING_STEPS)
   onboardingStep?: OnboardingStep;
+}
+
+/** Older businesses may hold free-text industries; only known types are reported. */
+export function asBusinessType(industry: string | null | undefined): BusinessType | null {
+  return industry && (BUSINESS_TYPES as string[]).includes(industry) ? (industry as BusinessType) : null;
 }

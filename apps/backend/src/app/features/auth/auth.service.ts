@@ -25,6 +25,7 @@ import { OrganizationsService } from "../organizations/organizations.service";
 export type { ClientInfo };
 import type { RegisterDto } from "./dto/auth.dto";
 import { passwordProblem } from "./password-policy";
+import { asBusinessType } from "../organizations/dto/organization.dto";
 import { PasswordService } from "./password.service";
 
 const MAX_FAILED_LOGINS = 5;
@@ -337,6 +338,7 @@ export class AuthService {
               code: b.code,
               timezone: b.timezone,
               employeeIdPrefix: b.employee_prefix,
+              businessType: asBusinessType(b.industry),
               businessRole: role === "MEMBER" ? businessRoles.get(b.id)! : null,
             })),
         }),

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Stack, TextField, Typography } from '@mui/material';
-import type { PayrollCompensation, PayrollItem, PayrollLine, PayrollReview, PayrollSettings, PayrollSetup, SaveCompensationRequest } from '@presqio/lib';
+import type { PayBasis, PayrollCompensation, PayrollItem, PayrollLine, PayrollReview, PayrollSettings, PayrollSetup, PayTerms, SaveCompensationRequest } from '@presqio/lib';
 import { payrollApi } from '@/api/payroll';
 import { errorMessage } from '@/api/client';
 import { useAdmin } from '@/hooks/use-admin';
@@ -22,30 +22,70 @@ export function LineEditor({title,rows,onChange,disabled,required=true}:{title:s
     <Button aria-label={`Remove ${row.label||'component'}`} disabled={disabled} onClick={() => onChange(rows.filter((_,j) => j!==i))}>Remove</Button>
   </Stack>)}<Button sx={{alignSelf:'flex-start'}} disabled={disabled||rows.length>=20} onClick={() => onChange([...rows,{label:'',value:'0.00'}])}>Add component</Button></Stack>;
 }
+/** How a salary version is paid, as the form edits it. */
+export type EditableTerms={payBasis:PayBasis;rate:string;standardHours:string;overtime:string};
+export const editableTerms=(c?:PayTerms):EditableTerms => ({payBasis:c?.payBasis??'MONTHLY',rate:c?.rate?inputRupees(c.rate):'',
+  standardHours:String((c?.standardDayMinutes??480)/60),overtime:c?.overtimePercent?String(c.overtimePercent):''});
+/** The pay terms to send; throws a message for the admin when something is off. */
+export function termsInput(t:EditableTerms):PayTerms {
+  const hours=Number(t.standardHours);
+  if (!/^\d{1,2}(?:\.\d{1,2})?$/.test(t.standardHours.trim())||hours<1||hours>24) throw new Error('Enter a normal working day between 1 and 24 hours.');
+  const minutes=Math.round(hours*60);
+  if (t.payBasis!=='MONTHLY'&&!t.rate.trim()) throw new Error(`Enter the ${t.payBasis==='DAILY'?'daily':'hourly'} wage.`);
+  const rate=t.payBasis==='MONTHLY'?null:parseRupees(t.rate);
+  if (rate===0) throw new Error('The wage must be more than ₹0.');
+  return {payBasis:t.payBasis,rate,standardDayMinutes:minutes,overtimePercent:t.overtime?Number(t.overtime):null};
+}
+const BASIS_HINT:Record<PayBasis,string>={
+  MONTHLY:'A fixed monthly salary, reduced for loss-of-pay days.',
+  DAILY:'Paid for each day worked, plus paid leave and holidays. Days not worked are simply not paid.',
+  HOURLY:'Paid for the hours checked in, up to the normal day; paid leave and holidays count as a normal day.',
+};
+export function PayTermsEditor({terms,onChange,disabled}:{terms:EditableTerms;onChange:(t:EditableTerms)=>void;disabled:boolean}) {
+  const set=(patch:Partial<EditableTerms>) => onChange({...terms,...patch});
+  return <Stack spacing={2}>
+    <Stack direction={{xs:'column',sm:'row'}} spacing={1}>
+      <TextField select label="Paid" value={terms.payBasis} onChange={e=>set({payBasis:e.target.value as PayBasis})} disabled={disabled} sx={{minWidth:200}} helperText={BASIS_HINT[terms.payBasis]}>
+        <MenuItem value="MONTHLY">Monthly salary</MenuItem><MenuItem value="DAILY">Per day worked</MenuItem><MenuItem value="HOURLY">Per hour worked</MenuItem>
+      </TextField>
+      {terms.payBasis!=='MONTHLY'&&<TextField required label={terms.payBasis==='DAILY'?'Daily wage (₹)':'Hourly wage (₹)'} value={terms.rate} onChange={e=>set({rate:e.target.value})} disabled={disabled} slotProps={{htmlInput:{inputMode:'decimal'}}} sx={{width:180}}/>}
+    </Stack>
+    <Stack direction={{xs:'column',sm:'row'}} spacing={1}>
+      <TextField label="Normal working day (hours)" value={terms.standardHours} onChange={e=>set({standardHours:e.target.value})} disabled={disabled} slotProps={{htmlInput:{inputMode:'decimal'}}} sx={{width:220}} helperText="Time checked in beyond this is overtime"/>
+      <TextField select label="Overtime pay" value={terms.overtime} onChange={e=>set({overtime:e.target.value})} disabled={disabled} sx={{minWidth:220}}
+        helperText={terms.overtime?`${Number(terms.overtime)/100}× the ${terms.payBasis==='MONTHLY'?"salary's hourly equivalent":'hourly rate'}`:'Extra time is recorded but not paid'}>
+        <MenuItem value="">Not paid</MenuItem><MenuItem value="100">Same rate (1×)</MenuItem><MenuItem value="150">Time and a half (1.5×)</MenuItem><MenuItem value="200">Double (2×)</MenuItem>
+      </TextField>
+    </Stack>
+  </Stack>;
+}
 export function SalaryForm({setup,employeeId,currentMonth,busy,onSave,onClose}:{setup:PayrollSetup;employeeId:string;currentMonth:string;busy:boolean;onSave:(request:SaveCompensationRequest)=>Promise<boolean>;onClose:()=>void}) {
   const existing=setup.compensations.find(c => c.employeeId===employeeId);
   const [effectiveMonth,setEffectiveMonth]=useState(existing?.effectiveMonth??currentMonth);
   const [earnings,setEarnings]=useState<EditableLine[]>(existing?editable(existing.earnings):defaultLines(DEFAULT_EARNINGS));
   const [deductions,setDeductions]=useState<EditableLine[]>(existing?editable(existing.deductions):defaultLines(DEFAULT_DEDUCTIONS));
+  const [terms,setTerms]=useState(editableTerms(existing));
   const [error,setError]=useState('');
   const employee=setup.employees.find(e => e.id===employeeId);
-  function applyVersion(version:PayrollCompensation) {setEffectiveMonth(version.effectiveMonth);setEarnings(editable(version.earnings));setDeductions(editable(version.deductions));}
+  function applyVersion(version:PayrollCompensation) {setEffectiveMonth(version.effectiveMonth);setEarnings(editable(version.earnings));setDeductions(editable(version.deductions));setTerms(editableTerms(version));}
   async function save(event:React.FormEvent) {
     event.preventDefault();setError('');
     try {
-      const earned=lines(earnings),deducted=lines(deductions);
-      if (!earned.length||!earned.some(l => l.amount>0)) throw new Error('Add at least one positive earning component.');
-      if (await onSave({employeeId,effectiveMonth,earnings:earned,deductions:deducted})) onClose();
+      const pay=termsInput(terms);
+      const earned=lines(earnings).filter(l => pay.payBasis==='MONTHLY'||l.amount>0),deducted=lines(deductions);
+      if (pay.payBasis==='MONTHLY'&&(!earned.length||!earned.some(l => l.amount>0))) throw new Error('Add at least one positive earning component.');
+      if (await onSave({employeeId,effectiveMonth,earnings:earned,deductions:deducted,...pay})) onClose();
     } catch(error) {setError(error instanceof Error?error.message:'Check the salary fields.');}
   }
   return <Dialog open onClose={busy?undefined:onClose} fullWidth maxWidth="md"><form onSubmit={save}><DialogTitle>Salary setup · {employee?.name}</DialogTitle><DialogContent><Stack spacing={2} sx={{pt:1}}>
     {error&&<Alert severity="error">{error}</Alert>}
-    <Alert severity="info">Fixed earnings use calendar-day proration. Deductions are manually configured monthly amounts and are not prorated. Tax and contribution rules are not calculated automatically.</Alert>
+    <PayTermsEditor terms={terms} onChange={setTerms} disabled={busy}/>
+    <Alert severity="info">{terms.payBasis==='MONTHLY'?'Fixed earnings use calendar-day proration.':'Earnings below are fixed monthly allowances paid on top of the wage (leave them at 0 if there are none).'} Deductions are manually configured monthly amounts and are not prorated. Tax and contribution rules are not calculated automatically.</Alert>
     <TextField select label="Load a saved salary version" value={setup.compensations.some(c => c.employeeId===employeeId&&c.effectiveMonth===effectiveMonth)?effectiveMonth:''} onChange={e => {const version=setup.compensations.find(c => c.employeeId===employeeId&&c.effectiveMonth===e.target.value);if(version)applyVersion(version);}} disabled={busy}>
       <MenuItem value="">New version</MenuItem>{setup.compensations.filter(c => c.employeeId===employeeId).map(c => <MenuItem key={c.id} value={c.effectiveMonth}>{monthLabel(c.effectiveMonth)}</MenuItem>)}
     </TextField>
     <TextField required label="Effective from month" type="month" value={effectiveMonth} onChange={e => setEffectiveMonth(e.target.value)} disabled={busy} slotProps={{inputLabel:{shrink:true}}} helperText="Applies from the first day of this month until the next salary version. Saving an existing month replaces that version; finalized payslips stay unchanged."/>
-    <LineEditor title="Monthly earnings" rows={earnings} onChange={setEarnings} disabled={busy}/>
+    <LineEditor title={terms.payBasis==='MONTHLY'?'Monthly earnings':'Fixed monthly allowances (optional)'} required={terms.payBasis==='MONTHLY'} rows={earnings} onChange={setEarnings} disabled={busy}/>
     <LineEditor title="Monthly deductions (optional)" required={false} rows={deductions} onChange={setDeductions} disabled={busy}/>
     <Typography variant="body2" color="text.secondary">PAN, bank, PF/ESI and other payslip details are edited in the employee's details (Employees → Edit).</Typography>
   </Stack></DialogContent><DialogActions><Button disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy} type="submit" variant="contained">Save salary version</Button></DialogActions></form></Dialog>;
@@ -92,26 +132,35 @@ export function ReviewForm({item,busy,onSave,onClose}:{item:PayrollItem;busy:boo
   const [note,setNote]=useState(item.review.note);
   const [accepted,setAccepted]=useState(item.review.acceptAttendanceExceptions);
   const [error,setError]=useState('');
-  const s=item.snapshot,a=s.attendance;
-  const exceptions=a.openSessions+a.pendingCorrections+a.missingDates.length+a.leaveDates.length+(a.unpaidLeaveDates?.length??0);
+  const s=item.snapshot,a=s.attendance,pay=s.pay;
+  const wage=pay&&pay.basis!=='MONTHLY';
+  const [overtime,setOvertime]=useState(item.review.overtimeMinutes==null?'':String(Math.round(item.review.overtimeMinutes/6)/10));
+  // daily and hourly wages already leave unworked days unpaid, so missing days aren't exceptions
+  const exceptions=a.openSessions+a.pendingCorrections+(wage?0:a.missingDates.length)+a.leaveDates.length+(a.unpaidLeaveDates?.length??0);
   const paidOff=(a.holidayDates?.length??0)+(a.paidLeaveDates?.length??0);
   async function save(event:React.FormEvent) {
     event.preventDefault();setError('');
     try {
       if (!/^\d+(?:\.5|\.0)?$/.test(lop)||Number(lop)>s.eligibleDays) throw new Error(`Enter LOP in half-day increments, up to ${s.eligibleDays} days.`);
-      if (await onSave({lopHalfDays:Number(lop)*2,acceptAttendanceExceptions:accepted,additionalEarnings:lines(earnings),additionalDeductions:lines(deductions),note})) onClose();
+      if (overtime.trim()&&(!/^\d{1,3}(?:\.\d)?$/.test(overtime.trim()))) throw new Error('Enter overtime in hours, e.g. 6 or 6.5, or leave it empty to use attendance.');
+      const overtimeMinutes=overtime.trim()?Math.round(Number(overtime)*60):null;
+      if (await onSave({lopHalfDays:Number(lop)*2,acceptAttendanceExceptions:accepted,additionalEarnings:lines(earnings),additionalDeductions:lines(deductions),note,...(overtimeMinutes!==null&&{overtimeMinutes})})) onClose();
     }catch(error){setError(error instanceof Error?error.message:'Check the review fields.');}
   }
   return <Dialog open onClose={busy?undefined:onClose} fullWidth maxWidth="md"><form onSubmit={save}><DialogTitle>Review · {s.employee.name} · {monthLabel(s.month)}</DialogTitle><DialogContent><Stack spacing={2} sx={{pt:1}}>
     {error&&<Alert severity="error">{error}</Alert>}
     <Alert severity="info">{s.eligibleDays} employed calendar days · {a.presentDays} days with attendance · {Math.floor(a.completedMinutes/60)}h {a.completedMinutes%60}m recorded. Missing attendance does not automatically deduct salary. Holidays and paid leave are already paid; the suggested LOP counts missing working days and unpaid leave.</Alert>
+    {wage&&<Alert severity="info">Paid {pay.basis==='DAILY'?`per day: ${pay.units} days`:`per hour: ${pay.units} hours`} at {money(pay.rate??0)}{pay.basis==='HOURLY'?'/h':'/day'}. Days not worked are not paid, so no loss of pay is suggested.</Alert>}
     {!!paidOff&&<Alert severity="success">Paid, no LOP: {a.holidayDates?.length?`holidays ${a.holidayDates.join(', ')}`:''}{a.holidayDates?.length&&a.paidLeaveDates?.length?' · ':''}{a.paidLeaveDates?.length?`paid leave ${a.paidLeaveDates.join(', ')}`:''}</Alert>}
     {s.blockers.map(message=><Alert severity="warning" key={message}>{message}</Alert>)}
     {!!exceptions&&<Alert severity="warning"><div>{a.openSessions} open sessions · {a.pendingCorrections} pending corrections</div><div>Missing dates: {a.missingDates.join(', ')||'None'}</div>{!!a.unpaidLeaveDates?.length&&<div>Unpaid leave (suggested as LOP): {a.unpaidLeaveDates.join(', ')}</div>}<div>Leave with no type (your decision): {a.leaveDates.join(', ')||'None'}</div></Alert>}
     <Typography variant="body2">Current calculation: {s.paidDays} paid days · {money(s.netPayable)} net payable. Saving this review refreshes salary and attendance from the server.</Typography>
-    <TextField required label="Loss-of-pay days" type="number" value={lop} onChange={e=>setLop(e.target.value)} disabled={busy} slotProps={{htmlInput:{min:0,max:s.eligibleDays,step:0.5}}}
-      helperText={`Suggested: ${s.suggestedLopHalfDays/2} (missing working days). Reduce it for holidays and paid leave.`}/>
-    <LineEditor title="Approved additional earnings (optional: overtime, bonus, arrears)" required={false} rows={earnings} onChange={setEarnings} disabled={busy}/>
+    <TextField required label={wage?'Days to dock (optional)':'Loss-of-pay days'} type="number" value={lop} onChange={e=>setLop(e.target.value)} disabled={busy} slotProps={{htmlInput:{min:0,max:s.eligibleDays,step:0.5}}}
+      helperText={wage?'Usually 0. Use it to dock half days, e.g. someone who left at lunch.':`Suggested: ${s.suggestedLopHalfDays/2} (missing working days). Reduce it for holidays and paid leave.`}/>
+    {pay?.overtimePercent!=null&&<TextField label="Overtime to pay (hours)" value={overtime} onChange={e=>setOvertime(e.target.value)} disabled={busy} slotProps={{htmlInput:{inputMode:'decimal'}}}
+      placeholder={String(Math.round(pay.overtimeWorkedMinutes/6)/10)}
+      helperText={`Attendance shows ${hm(pay.overtimeWorkedMinutes)} beyond ${pay.standardDayMinutes/60} h days, paid at ${pay.overtimePercent/100}× (${money(pay.overtimeRate??0)}/h). Leave empty to pay that; enter fewer hours to pay only approved overtime.`}/>}
+    <LineEditor title={pay?.overtimePercent!=null?'Approved additional earnings (optional: bonus, arrears)':'Approved additional earnings (optional: overtime, bonus, arrears)'} required={false} rows={earnings} onChange={setEarnings} disabled={busy}/>
     <LineEditor title="Additional deductions (optional: advance recovery, adjustments)" required={false} rows={deductions} onChange={setDeductions} disabled={busy}/>
     {!!exceptions&&<FormControlLabel control={<Checkbox checked={accepted} onChange={e=>setAccepted(e.target.checked)} disabled={busy}/>} label="I have classified the listed attendance exceptions and leave, and approved their treatment in this payroll."/>}
     <TextField required label="Review note and reason for adjustments" multiline minRows={2} value={note} onChange={e=>setNote(e.target.value)} disabled={busy} slotProps={{htmlInput:{minLength:5,maxLength:1000}}}/>
@@ -140,3 +189,5 @@ export function BulkPaymentForm({items,today,busy,onSave,onClose}:{items:Payroll
     <TextField required label="Payment date" type="date" value={paidOn} onChange={e=>setPaidOn(e.target.value)} disabled={busy} slotProps={{inputLabel:{shrink:true},htmlInput:{max:today}}}/>
   </Stack></DialogContent><DialogActions><Button disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy||!due.length} variant="contained" type="submit">Record {money(total)}</Button></DialogActions></form></Dialog>;
 }
+
+const hm=(minutes:number) => `${Math.floor(minutes/60)}h ${minutes%60}m`;

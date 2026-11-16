@@ -9,6 +9,8 @@ import type {
 } from "@presqio/lib";
 import { errorMessage } from "@/api/client";
 import { businessApi, organizationsApi } from "@/api/endpoints";
+import { timeOffApi } from "@/api/time-off";
+import { businessPreset } from "@/utils/business-types";
 import { useAuth } from "@/hooks/use-auth";
 import { FullPageStatus } from "@/router/route-guards";
 import { STEPS, stepIndex, visibleStep } from "./onboarding-options";
@@ -85,18 +87,35 @@ export function OnboardingPage() {
 
   const back = (from: OnboardingStep) => setView(STEPS[Math.max(0, stepIndex(from) - 1)].id);
 
-  async function saveOrganization(values: OrganizationValues) {
+  /** A new business starts with the leave types that suit it (only when it has none yet). */
+  async function seedLeaveTypes(organization: OrganizationDetail) {
+    const business = organization.defaultBusiness;
+    if (!business?.businessType) return;
+    try {
+      const existing = await timeOffApi.leaveTypes(organization.id, business.id);
+      if (existing.length) return;
+      for (const type of businessPreset(business.businessType).leaveTypes)
+        await timeOffApi.createLeaveType(organization.id, business.id, type);
+    } catch {
+      // Optional: the admin can add leave types under Holidays & leave.
+    }
+  }
+
+  async function saveOrganization(raw: OrganizationValues) {
+    const values = { ...raw, businessType: raw.businessType ?? undefined };
     if (!organizationId) {
       // Signed-in user without an organization (e.g. one who left their last one).
       const created = await organizationsApi.create(values);
       auth.setActiveOrganization(created.id);
       const organization = await organizationsApi.update(created.id, { onboardingStep: "BRANCH" });
+      await seedLeaveTypes(organization);
       setProgress({ organization, branches: [], shifts: [] });
       await auth.reload();
       setView("BRANCH");
       return;
     }
     const organization = await organizationsApi.update(organizationId, values);
+    await seedLeaveTypes(organization);
     setProgress((current) => current && { ...current, organization });
     await advance("ORGANIZATION");
   }
@@ -120,6 +139,7 @@ export function OnboardingPage() {
   const current = stepIndex(view);
   const organization = progress?.organization ?? null;
   const business = organization?.defaultBusiness ?? null;
+  const preset = businessPreset(business?.businessType);
 
   return (
     <Shell>
@@ -166,6 +186,7 @@ export function OnboardingPage() {
           )}
           {view === "BRANCH" && organization && business && (
             <BranchStep
+              site={preset.site}
               branches={progress!.branches}
               onBack={() => back("BRANCH")}
               onCreate={async (request) => {
@@ -177,6 +198,7 @@ export function OnboardingPage() {
           )}
           {view === "SHIFT" && organization && business && (
             <ShiftStep
+              preset={preset}
               shifts={progress!.shifts}
               onBack={() => back("SHIFT")}
               onCreate={async (request) => {

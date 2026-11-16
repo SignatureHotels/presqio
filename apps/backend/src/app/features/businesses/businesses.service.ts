@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import type { AccessibleBusiness } from "@presqio/lib";
 import type { OrganizationContext } from "../../common/auth/auth.types";
 import { DatabaseService } from "../../common/database/database.service";
+import { asBusinessType } from "../organizations/dto/organization.dto";
 import { randomSuffix, slugify } from "../../common/security/tokens";
 
 @Injectable()
@@ -34,6 +35,7 @@ export class BusinessesService {
       code: b.code,
       timezone: b.timezone,
       employeeIdPrefix: b.employee_prefix,
+      businessType: asBusinessType(b.industry),
       businessRole:
         org.role === "MEMBER" ? (b.business_memberships_business_id_rows[0]?.role ?? null) : null,
     }));
@@ -46,7 +48,7 @@ export class BusinessesService {
    */
   async createDefault(
     tx: Prisma.TransactionClient,
-    organization: { id: string; name: string; country: string; defaultTimezone: string },
+    organization: { id: string; name: string; country: string; defaultTimezone: string; industry?: string },
   ) {
     return tx.businesses.create({
       data: {
@@ -57,6 +59,7 @@ export class BusinessesService {
         slug: await this.uniqueSlug(tx, organization.id, organization.name),
         country: organization.country,
         timezone: organization.defaultTimezone,
+        industry: organization.industry,
       },
     });
   }

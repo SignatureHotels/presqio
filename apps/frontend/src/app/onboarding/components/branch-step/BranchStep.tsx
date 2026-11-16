@@ -21,11 +21,14 @@ const emptyDraft = (): Draft => ({
 });
 
 export function BranchStep({
+  site = "branch",
   branches,
   onCreate,
   onContinue,
   onBack,
 }: {
+  /** What the business calls one location ("store", "site"). */
+  site?: string;
   branches: BranchRecord[];
   onCreate: (request: CreateBranchRequest) => Promise<void>;
   onContinue: () => Promise<void>;
@@ -100,11 +103,11 @@ export function BranchStep({
   return (
     <StepFrame
       eyebrow="Step 2"
-      title="Add a branch and its check-in perimeter"
-      description="Employees can check in only inside this circle. Stand at the branch entrance and use your current location for the most accurate centre."
+      title={`Add ${article(site)} ${site} and its check-in perimeter`}
+      description={`Employees can check in only inside this circle. Stand at the ${site} entrance and use your current location for the most accurate centre.`}
       error={error}
       busy={busy}
-      submitLabel={adding ? "Save branch" : "Continue"}
+      submitLabel={adding ? `Save ${site}` : "Continue"}
       submitDisabled={adding ? !draftValid : branches.length === 0}
       onSubmit={submit}
       onBack={onBack}
@@ -131,7 +134,7 @@ export function BranchStep({
         <>
           <div className="form-columns">
             <TextField
-              label="Branch name"
+              label={`${cap(site)} name`}
               required
               autoFocus
               value={draft.name}
@@ -202,17 +205,22 @@ export function BranchStep({
             />
           </SliderField>
           {branches.length > 0 && (
-            <Button onClick={() => setAdding(false)}>Cancel adding branch</Button>
+            <Button onClick={() => setAdding(false)}>Cancel adding {site}</Button>
           )}
         </>
       ) : (
         <>
           <Button variant="outlined" onClick={() => setAdding(true)} startIcon={<Icon name="plus" className="tiny" />}>
-            Add another branch
+            Add another {site}
           </Button>
-          <Alert severity="info">You can add and edit branches any time from Branches.</Alert>
+          <Alert severity="info">
+            You can add and edit {site === "branch" ? "branches" : `${site}s (listed under Branches)`} any time.
+          </Alert>
         </>
       )}
     </StepFrame>
   );
 }
+
+const article = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
+const cap = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);

@@ -5,16 +5,18 @@ import { errorMessage } from "@/api/client";
 import { Icon } from "@/components";
 import { StepFrame, StepList, StepListIcon } from "../step-frame";
 import { WEEKDAYS } from "../../onboarding-options";
+import type { BusinessPreset } from "@/utils/business-types";
 import { WeekdayPicker, WeekdayToggle } from "./ShiftStep.style";
 
-const defaultDraft = (): Required<CreateShiftRequest> => ({
+const GENERAL: Required<CreateShiftRequest> = {
   name: "General shift",
   start: "09:00",
   end: "18:00",
   graceMinutes: 10,
   breakMinutes: 60,
   workingDays: [1, 2, 3, 4, 5, 6],
-});
+};
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 const dayLabel = (days: Weekday[]) =>
   WEEKDAYS.filter((w) => days.includes(w.day))
@@ -26,12 +28,16 @@ export function ShiftStep({
   onCreate,
   onContinue,
   onBack,
+  preset,
 }: {
+  preset: BusinessPreset;
   shifts: ShiftRecord[];
   onCreate: (request: CreateShiftRequest) => Promise<void>;
   onContinue: () => Promise<void>;
   onBack: () => void;
 }) {
+  const suggested = preset.shifts.filter((p) => !shifts.some((s) => sameName(s.name, p.name)));
+  const defaultDraft = (): Required<CreateShiftRequest> => ({ ...(suggested[0] ?? GENERAL) });
   const [adding, setAdding] = useState(shifts.length === 0);
   const [draft, setDraft] = useState(defaultDraft);
   const [error, setError] = useState("");
@@ -59,7 +65,7 @@ export function ShiftStep({
     try {
       if (adding) {
         await onCreate({ ...draft, name: draft.name.trim() });
-        setDraft(defaultDraft());
+        setDraft({ ...(suggested.find((p) => !sameName(p.name, draft.name)) ?? GENERAL) });
         setAdding(false);
         setBusy(false);
       } else {
@@ -69,6 +75,18 @@ export function ShiftStep({
       setError(errorMessage(caught));
       setBusy(false);
     }
+  }
+
+  async function addSuggested(list: Required<CreateShiftRequest>[]) {
+    setBusy(true);
+    setError("");
+    try {
+      for (const item of list) await onCreate(item);
+      setAdding(false);
+    } catch (caught) {
+      setError(errorMessage(caught));
+    }
+    setBusy(false);
   }
 
   const minutes = (key: "graceMinutes" | "breakMinutes", label: string, max: number, helper: string) => (
@@ -96,6 +114,29 @@ export function ShiftStep({
       onSubmit={submit}
       onBack={onBack}
     >
+      {suggested.length > 0 && (
+        <Alert
+          severity="info"
+          action={
+            suggested.length > 1 ? (
+              <Button color="inherit" size="small" disabled={busy} onClick={() => void addSuggested(suggested)}>
+                Add all {suggested.length}
+              </Button>
+            ) : undefined
+          }
+        >
+          <strong>Suggested for {preset.label.toLowerCase()}:</strong>{" "}
+          {suggested.map((p, i) => (
+            <span key={p.name}>
+              {i > 0 && " · "}
+              <Button size="small" disabled={busy} onClick={() => { setDraft({ ...p }); setAdding(true); }} sx={{ p: 0, minWidth: 0, verticalAlign: "baseline" }}>
+                {p.name} {p.start}–{p.end}
+              </Button>
+            </span>
+          ))}
+          <div className="sm">{preset.tip}</div>
+        </Alert>
+      )}
       {shifts.length > 0 && (
         <StepList>
           {shifts.map((shift) => (

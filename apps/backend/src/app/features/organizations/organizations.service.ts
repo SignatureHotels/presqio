@@ -4,7 +4,7 @@ import type { OrganizationDetail } from "@presqio/lib";
 import { DatabaseService } from "../../common/database/database.service";
 import { BusinessesService } from "../businesses/businesses.service";
 import { randomSuffix, slugify } from "../../common/security/tokens";
-import type { CreateOrganizationDto, UpdateOrganizationDto } from "./dto/organization.dto";
+import { asBusinessType, type CreateOrganizationDto, type UpdateOrganizationDto } from "./dto/organization.dto";
 
 /** New organizations get a full-featured trial so multi-branch setup can be tried. */
 const TRIAL_PLAN = "GROWTH";
@@ -31,7 +31,7 @@ export class OrganizationsService {
    */
   async createWithOwner(
     tx: Prisma.TransactionClient,
-    input: { ownerId: string; name: string; country?: string; defaultTimezone?: string },
+    input: { ownerId: string; name: string; country?: string; defaultTimezone?: string; businessType?: string },
   ) {
     const organization = await tx.organizations.create({
       data: {
@@ -58,6 +58,7 @@ export class OrganizationsService {
       name: organization.name,
       country: organization.country,
       defaultTimezone: organization.default_timezone,
+      industry: input.businessType,
     });
     return organization;
   }
@@ -109,7 +110,7 @@ export class OrganizationsService {
       // Keep the organization's business (which holds the branches) in step with it.
       this.db.businesses.updateMany({
         where: { organization_id: organizationId },
-        data: { name: dto.name, country: dto.country, timezone: dto.defaultTimezone },
+        data: { name: dto.name, country: dto.country, timezone: dto.defaultTimezone, industry: dto.businessType },
       }),
     ]);
     return this.detail(organizationId);
@@ -142,6 +143,7 @@ const toDetail = (org: OrganizationRow): OrganizationDetail => ({
         code: org.businesses_organization_id_rows[0].code,
         timezone: org.businesses_organization_id_rows[0].timezone,
         employeeIdPrefix: org.businesses_organization_id_rows[0].employee_prefix,
+        businessType: asBusinessType(org.businesses_organization_id_rows[0].industry),
       }
     : null,
   subscription: org.subscription && {

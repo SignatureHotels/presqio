@@ -1,5 +1,6 @@
 import { Type, Transform } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDefined, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
+import type { PayBasis } from '@presqio/lib';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDefined, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 export class PayrollLineDto {
   @Transform(({value}) => typeof value === 'string' ? value.trim() : value)
@@ -23,8 +24,14 @@ export class PayrollProfileDto {
 }
 export class PayrollSalaryDto {
   @Matches(/^\d{4}-(0[1-9]|1[0-2])$/) effectiveMonth!: string;
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ValidateNested({each:true}) @Type(() => PayrollLineDto) earnings!: PayrollLineDto[];
+  /** Daily and hourly wages may have no other earnings; a monthly salary needs at least one (checked when saving). */
+  @IsArray() @ArrayMaxSize(20) @ValidateNested({each:true}) @Type(() => PayrollLineDto) earnings!: PayrollLineDto[];
   @IsArray() @ArrayMaxSize(20) @ValidateNested({each:true}) @Type(() => PayrollLineDto) deductions!: PayrollLineDto[];
+  @IsOptional() @IsIn(['MONTHLY','DAILY','HOURLY']) payBasis?: PayBasis;
+  /** Paise per day or hour. */
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(1) @Max(100_000_000_000) rate?: number | null;
+  @IsOptional() @IsInt() @Min(60) @Max(1440) standardDayMinutes?: number;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(100) @Max(300) overtimePercent?: number | null;
 }
 export class SaveCompensationDto extends PayrollSalaryDto {
   @IsUUID() employeeId!: string;
@@ -48,6 +55,8 @@ export class PayrollReviewDto {
   @IsArray() @ArrayMaxSize(10) @ValidateNested({each:true}) @Type(() => PayrollLineDto) additionalDeductions!: PayrollLineDto[];
   @Transform(({value}) => typeof value === 'string' ? value.trim() : value)
   @IsString() @Length(5, 1000) note!: string;
+  /** Overtime to pay instead of what attendance shows; null or absent uses attendance. */
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(0) @Max(20_000) overtimeMinutes?: number | null;
 }
 export class PayrollApproveDto {
   @Transform(({value}) => typeof value === 'string' ? value.trim() : value)

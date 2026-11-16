@@ -22,19 +22,24 @@ import type { Employee } from "@/types/admin-preview";
 import {
   defaultLines,
   editable,
+  editableTerms,
   lines,
   LineEditor,
+  PayTermsEditor,
+  termsInput,
   type EditableLine,
+  type EditableTerms,
 } from "@/app/admin/payroll/PayrollForms";
 import { DEFAULT_DEDUCTIONS, DEFAULT_EARNINGS, EMPTY_PROFILE } from "@/app/admin/payroll/payroll-utils";
 import { invalidatePayroll } from "@/app/admin/payroll/payroll-cache";
+import { businessPreset } from "@/utils/business-types";
 
 const PHONE = /^\+?[0-9][0-9 ()-]{6,19}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE = /^[A-Z0-9][A-Z0-9-]{1,19}$/;
 const PAN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
-type Salary = { effectiveMonth: string; earnings: EditableLine[]; deductions: EditableLine[] };
+type Salary = { effectiveMonth: string; earnings: EditableLine[]; deductions: EditableLine[]; terms: EditableTerms };
 
 /** Add a new employee, or edit one when `employee` is given. */
 export function EmployeeDialog({
@@ -61,13 +66,15 @@ export function EmployeeDialog({
     email: employee?.email ?? "",
     joinedOn: employee?.joinedOn ?? today ?? "",
     otherBranchIds: employee?.otherBranchIds ?? ([] as string[]),
-    checkInAnywhere: employee?.checkInAnywhere ?? false,
+    // Field businesses start new people with check-in from anywhere.
+    checkInAnywhere: employee?.checkInAnywhere ?? Boolean(businessPreset(organization?.defaultBusiness?.businessType).checkInAnywhere),
   });
   const [profile, setProfile] = useState<PayrollProfile>(EMPTY_PROFILE);
   const newSalary = (month: string): Salary => ({
     effectiveMonth: month,
     earnings: defaultLines(DEFAULT_EARNINGS),
     deductions: defaultLines(DEFAULT_DEDUCTIONS),
+    terms: editableTerms(),
   });
   const [salary, setSalary] = useState<Salary>(newSalary((today ?? "").slice(0, 7)));
   const [loadedSalary, setLoadedSalary] = useState("");
@@ -91,7 +98,12 @@ export function EmployeeDialog({
         setProfile(details.profile);
         const latest = details.compensations[0];
         const loaded = latest
-          ? { effectiveMonth: latest.effectiveMonth, earnings: editable(latest.earnings), deductions: editable(latest.deductions) }
+          ? {
+              effectiveMonth: latest.effectiveMonth,
+              earnings: editable(latest.earnings),
+              deductions: editable(latest.deductions),
+              terms: editableTerms(latest),
+            }
           : newSalary((today ?? "").slice(0, 7));
         setSalary(loaded);
         setLoadedSalary(latest ? JSON.stringify(loaded) : "");
@@ -115,16 +127,20 @@ export function EmployeeDialog({
       throw new Error("Bank account number must be 6–20 digits.");
     if (p.bankIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(p.bankIfsc.trim()))
       throw new Error("IFSC must look like HDFC0001234 (11 characters).");
-    const earnings = lines(salary.earnings);
+    const monthly = salary.terms.payBasis === "MONTHLY";
+    // Daily and hourly wages often have no other earnings; zero rows are dropped for them.
+    const earnings = lines(salary.earnings).filter((l) => monthly || l.amount > 0);
     const deductions = lines(salary.deductions);
-    const hasSalary = earnings.some((l) => l.amount > 0);
+    const hasSalary = monthly ? earnings.some((l) => l.amount > 0) : Boolean(salary.terms.rate.trim());
     const changed = JSON.stringify(salary) !== loadedSalary;
     if (hasSalary && !/^\d{4}-\d{2}$/.test(salary.effectiveMonth))
       throw new Error("Choose the month this salary applies from.");
-    if (loadedSalary && changed && !hasSalary) throw new Error("Add at least one positive earning.");
+    if (loadedSalary && changed && !hasSalary)
+      throw new Error(monthly ? "Add at least one positive earning." : "Enter the wage.");
+    const terms = hasSalary && changed ? termsInput(salary.terms) : undefined;
     return {
       profile: p,
-      salary: hasSalary && changed ? { effectiveMonth: salary.effectiveMonth, earnings, deductions } : undefined,
+      salary: terms ? { effectiveMonth: salary.effectiveMonth, earnings, deductions, ...terms } : undefined,
     };
   }
 
@@ -339,16 +355,24 @@ export function EmployeeDialog({
                 <TextField label="Bank branch" value={profile.bankBranch} onChange={setField("bankBranch")} slotProps={{ htmlInput: { maxLength: 100 } }} />
               </div>
 
-              <Typography fontWeight={700}>Monthly salary</Typography>
+              <Typography fontWeight={700}>Pay</Typography>
+              <PayTermsEditor terms={salary.terms} onChange={(terms) => setSalary({ ...salary, terms })} disabled={busy} />
               <TextField
                 type="month"
                 label="Salary effective from"
                 value={salary.effectiveMonth}
                 onChange={(event) => setSalary({ ...salary, effectiveMonth: event.target.value })}
                 slotProps={date}
-                helperText="Choose a later month to record a raise; earlier payslips stay unchanged. Leave all earnings at 0 to set salary later."
+                helperText={
+                  salary.terms.payBasis === "MONTHLY"
+                    ? "Choose a later month to record a raise; earlier payslips stay unchanged. Leave all earnings at 0 to set salary later."
+                    : "Choose a later month to record a raise; earlier payslips stay unchanged. Leave the wage empty to set pay later."
+                }
               />
-              <LineEditor title="Earnings" rows={salary.earnings} onChange={(earnings) => setSalary({ ...salary, earnings })} disabled={busy} />
+              <LineEditor
+                title={salary.terms.payBasis === "MONTHLY" ? "Earnings" : "Fixed monthly allowances (optional)"}
+                required={salary.terms.payBasis === "MONTHLY"}
+                rows={salary.earnings} onChange={(earnings) => setSalary({ ...salary, earnings })} disabled={busy} />
               <LineEditor title="Deductions (optional)" required={false} rows={salary.deductions} onChange={(deductions) => setSalary({ ...salary, deductions })} disabled={busy} />
             </>
           )}

@@ -875,16 +875,24 @@ model payroll_settings {
 }
 
 model payroll_compensations {
-  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  business_id     String     @db.Uuid
-  employee_id     String     @db.Uuid
-  effective_month DateTime   @db.Date
-  earnings_json   Json
-  deductions_json Json
-  created_by      String     @db.Uuid
-  created_at      DateTime   @default(now()) @db.Timestamptz(3)
-  business_ref    businesses @relation(fields: [business_id], references: [id], onDelete: Restrict)
-  employee_ref    employees  @relation(fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict)
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id      String     @db.Uuid
+  employee_id      String     @db.Uuid
+  effective_month  DateTime   @db.Date
+  earnings_json    Json
+  deductions_json  Json
+  /// MONTHLY (salary prorated by paid days), DAILY (rate per day worked) or HOURLY (rate per hour worked).
+  pay_basis        String     @default("MONTHLY")
+  /// Paise per day or per hour; null for a monthly salary.
+  rate             BigInt?
+  /// A normal working day; time beyond it is overtime.
+  standard_day_min Int        @default(480)
+  /// Overtime pay as a percentage of the hourly rate (100, 150, 200); null when overtime isn't paid.
+  overtime_pct     Int?
+  created_by       String     @db.Uuid
+  created_at       DateTime   @default(now()) @db.Timestamptz(3)
+  business_ref     businesses @relation(fields: [business_id], references: [id], onDelete: Restrict)
+  employee_ref     employees  @relation(fields: [business_id, employee_id], references: [business_id, id], onDelete: Restrict)
 
   @@unique([business_id, employee_id, effective_month])
 }

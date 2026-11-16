@@ -13,6 +13,10 @@ export interface Business {
   id: string;
   name: string;
 }
+/** What kind of business this is; picks starting shifts, leave types and wording. */
+export type BusinessType =
+  | "office" | "retail" | "restaurant" | "clinic" | "factory" | "construction"
+  | "security" | "school" | "salon" | "field" | "other";
 export interface BusinessSummary {
   id: string;
   name: string;
@@ -21,6 +25,8 @@ export interface BusinessSummary {
   timezone: string;
   /** Start of generated employee IDs, e.g. "SGH" → SGH0001. Unique across organizations. */
   employeeIdPrefix: string;
+  /** Null for businesses set up before the type was asked. */
+  businessType: BusinessType | null;
 }
 export interface OrganizationSummary {
   id: string;
@@ -54,10 +60,12 @@ export interface CreateOrganizationRequest {
   name: string;
   country?: string;
   defaultTimezone?: string;
+  businessType?: BusinessType;
 }
 export interface UpdateOrganizationRequest {
   name?: string;
   country?: string;
   defaultTimezone?: string;
+  businessType?: BusinessType;
   onboardingStep?: OnboardingStep;
 }
