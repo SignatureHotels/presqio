@@ -95,7 +95,7 @@ export class EmployeePortalService {
     const shiftRow = usual?.shift_id_ref;
     const plan = dayPlan((await rosterDays(this.db, ctx.businessId, today, today, [ctx.employeeId])).get(`${ctx.employeeId}:${today}`),
       usual ? { shift: usual.shift_id_ref, workingDays: workingDaysOf(usual) } : null, isoWeekday(today));
-    const [open, todays, leaveToday] = await Promise.all([
+    const [open, todays, leaveToday, holidayToday] = await Promise.all([
       this.openSession(ctx.businessId, ctx.employeeId),
       this.db.attendance_sessions.findMany({
         where: { business_id: ctx.businessId, employee_id: ctx.employeeId, work_date: dateOnly(today) },
@@ -109,6 +109,7 @@ export class EmployeePortalService {
           cancelled_at: null,
         },
       }),
+      this.db.calendars.findFirst({ where: { business_id: ctx.businessId, calendar_date: dateOnly(today), is_working_day: false }, select: { name: true } }),
     ]);
     const first = open ?? todays[0];
     const lastClosed = [...todays].reverse().find((s) => s.closed_at);
@@ -152,7 +153,7 @@ export class EmployeePortalService {
         status: !checkIn
           ? leaveToday
             ? "On leave"
-            : "Not checked in"
+            : plan.off || holidayToday ? "Day off" : "Not checked in"
           : minutesOf(checkIn) > graceEnd
             ? "Late"
             : "Present",
@@ -163,8 +164,8 @@ export class EmployeePortalService {
             ? minutesEarly(timezone, today, lastClosed.closed_at, lastClosed.shift_snapshot as ShiftSnapshot)
             : null,
         onLeave: !checkIn && leaveToday > 0,
-        shifts: plan.shifts.map(shiftInfo),
-        dayOff: plan.off,
+        shifts: holidayToday ? [] : plan.shifts.map(shiftInfo),
+        dayOff: plan.off || Boolean(holidayToday),
       },
     };
   }

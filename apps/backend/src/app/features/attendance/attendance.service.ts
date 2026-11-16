@@ -9,7 +9,7 @@ import type {
   Weekday,
 } from "@presqio/lib";
 import { DatabaseService } from "../../common/database/database.service";
-import { rosterDays } from "../roster/roster-schedule";
+import { rosterDays, workingDaysOf } from "../roster/roster-schedule";
 import { assertBranchInScope, employeesInScope, type BranchScope } from "../../common/auth/branch-scope";
 import {
   addDays,
@@ -84,12 +84,12 @@ export class AttendanceService {
     const byEmployee = new Map<string, ShiftInfo & { shiftId: string }>();
     for (const row of rows) {
       if (byEmployee.has(row.employee_id)) continue;
-      const policy = (row.shift_id_ref.policy_json ?? {}) as { workingDays?: Weekday[] };
       byEmployee.set(row.employee_id, {
         shiftId: row.shift_id,
         startMinutes: minutesOf(fromTime(row.shift_id_ref.starts_local)),
         graceMinutes: row.shift_id_ref.grace_min,
-        workingDays: policy.workingDays ?? [1, 2, 3, 4, 5, 6],
+        // the same working days the register and payroll use
+        workingDays: workingDaysOf(row) as Weekday[],
       });
     }
     return byEmployee;
@@ -108,7 +108,7 @@ export class AttendanceService {
   private async loadToday(businessId: string) {
     const timezone = await this.timezoneOf(businessId);
     const date = localDate(timezone);
-    const [sessions, shifts, leaves] = await Promise.all([
+    const [sessions, shifts, leaves, roster, holiday] = await Promise.all([
       this.db.attendance_sessions.findMany({
         where: { business_id: businessId, work_date: dateOnly(date) },
         orderBy: { opened_at: "asc" },
@@ -130,7 +130,18 @@ export class AttendanceService {
         orderBy: { leave_date: "asc" },
         select: { employee_id: true, leave_date: true },
       }),
+      rosterDays(this.db, businessId, date, date),
+      this.db.calendars.findFirst({ where: { business_id: businessId, calendar_date: dateOnly(date), is_working_day: false }, select: { id: true } }),
     ]);
+    // Not expected in today: a holiday, a rostered day off, or a weekly off on the usual shift.
+    const weekday = isoWeekday(date) as Weekday;
+    const dayOff = (employeeId: string) => {
+      if (holiday) return true;
+      const rostered = roster.get(`${employeeId}:${date}`);
+      if (rostered) return rostered.off;
+      const shift = shifts.get(employeeId);
+      return Boolean(shift && !shift.workingDays.includes(weekday));
+    };
     const upcomingLeave = new Map<string, string[]>();
     for (const leave of leaves) {
       const list = upcomingLeave.get(leave.employee_id) ?? [];
@@ -185,7 +196,7 @@ export class AttendanceService {
         const leave = upcomingLeave.get(employeeId) ?? [];
         return {
           ...NOT_CHECKED_IN,
-          status: leave[0] === date ? "On leave" : "Not checked in",
+          status: leave[0] === date ? "On leave" : dayOff(employeeId) ? "Day off" : "Not checked in",
           upcomingLeave: leave,
         };
       },
@@ -240,13 +251,15 @@ export class AttendanceService {
     // Today's summary.
     const snapshots = employees.map((e) => today.snapshotOf(e.id));
     const present = snapshots.filter((s) => s.status === "Present" || s.status === "Late").length;
+    const off = snapshots.filter((s) => s.status === "Day off").length;
     const summary: AttendanceSummary = {
       total: employees.length,
       present,
       late: snapshots.filter((s) => s.status === "Late").length,
       leave: snapshots.filter((s) => s.status === "On leave").length,
       waiting: snapshots.filter((s) => s.status === "Not checked in").length,
-      rate: employees.length ? Math.round((present / employees.length) * 100) : 0,
+      off,
+      rate: employees.length - off > 0 ? Math.round((present / (employees.length - off)) * 100) : 0,
     };
 
     // Last seven days: scheduled = employees on the books whose shift covers that weekday.

@@ -32,7 +32,7 @@ export function EmployeeFilters({
         onChange={(event) => setStatus(event.target.value)}
       >
         <option value="all">All statuses</option>
-        {["Present", "Late", "Not checked in", "On leave"].map((value) => (
+        {["Present", "Late", "Not checked in", "On leave", "Day off"].map((value) => (
           <option key={value}>{value}</option>
         ))}
       </select>

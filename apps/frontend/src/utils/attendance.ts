@@ -10,12 +10,15 @@ export function attendanceSummary(employees: EmployeeTableRow[]) {
   const leave = employees.filter(
     (employee) => employee.status === "On leave",
   ).length;
+  // rostered off, a weekly off or a holiday: not expected, so not waiting and not in the rate
+  const off = employees.filter((employee) => employee.status === "Day off").length;
   return {
     total,
     present,
     late,
     leave,
-    waiting: total - present - leave,
-    rate: total ? Math.round((present / total) * 100) : 0,
+    off,
+    waiting: total - present - leave - off,
+    rate: total - off > 0 ? Math.round((present / (total - off)) * 100) : 0,
   };
 }

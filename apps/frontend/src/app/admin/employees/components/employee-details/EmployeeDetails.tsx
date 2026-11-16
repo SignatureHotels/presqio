@@ -145,8 +145,8 @@ export function EmployeeDetails({
                       "Attendance",
                       employee.checkIn
                         ? `In ${employee.checkIn}${employee.checkOut ? ` · Out ${employee.checkOut}${employee.earlyMinutes ? ` (${employee.earlyMinutes} min early)` : ""}` : " · still checked in"}`
-                        : employee.status === "On leave"
-                          ? "On leave"
+                        : employee.status === "On leave" || employee.status === "Day off"
+                          ? employee.status
                           : "Not checked in",
                     ],
                     ["Status", <StatusChip key="status" status={employee.status} />],

@@ -31,7 +31,7 @@ export function AttendanceSummary({
         {
           title: "Present today",
           value: summary.present,
-          note: `${summary.rate}% attendance · includes late`,
+          note: `${summary.rate}% of those expected · includes late`,
           icon: "check",
           color: "success",
         },
@@ -45,7 +45,7 @@ export function AttendanceSummary({
         {
           title: "Not checked in",
           value: summary.waiting,
-          note: "Awaiting attendance · not marked absent",
+          note: summary.off ? `Expected today · ${summary.off} on a day off` : "Awaiting attendance · not marked absent",
           icon: "calendar",
           color: "error",
         },

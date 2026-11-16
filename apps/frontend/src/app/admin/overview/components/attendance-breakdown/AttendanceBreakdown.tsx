@@ -46,6 +46,7 @@ export function AttendanceBreakdown() {
           ["Late", summary.late, "var(--warning)"],
           ["On leave", summary.leave, "var(--primary)"],
           ["Not checked in", summary.waiting, "var(--neutral-soft)"],
+          ...(summary.off ? [["Day off", summary.off, "var(--line)"]] : []),
         ].map(([label, value, color]) => (
           <LegendRow key={label}>
             <i className="dot" style={{ background: String(color) }} />

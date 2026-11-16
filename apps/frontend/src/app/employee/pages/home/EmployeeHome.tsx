@@ -101,7 +101,9 @@ export function EmployeeHome() {
                 ? t("home.doneToday")
                 : today.onLeave
                   ? t("home.onLeaveToday")
-                  : t("home.notCheckedIn")}
+                  : today.dayOff
+                    ? t("home.dayOff")
+                    : t("home.notCheckedIn")}
           </StateChip>
         </StateRow>
         <Clock>{clockIn(timezone, now)}</Clock>

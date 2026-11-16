@@ -15,6 +15,8 @@ test("daily attendance exposes both in/out photo IDs and times without a face se
     ]; } },
     shift_assignments: { async findMany() { return []; } },
     leave_days: { async findMany() { return []; } },
+    roster_entries: { async findMany() { return []; } },
+    calendars: { async findFirst() { return null; } },
     // No face checks/enrollment provider is configured or available in this fixture.
   };
   const today = await new AttendanceService(db as unknown as DatabaseService).today("business");
@@ -38,6 +40,8 @@ test("simultaneous attendance reads share queries, then fetch fresh data", async
     attendance_sessions: { async findMany() { return []; } },
     shift_assignments: { async findMany() { return []; } },
     leave_days: { async findMany() { return []; } },
+    roster_entries: { async findMany() { return []; } },
+    calendars: { async findFirst() { return null; } },
   };
   const service = new AttendanceService(db as unknown as DatabaseService);
   const [first, second] = await Promise.all([service.today("business"), service.today("business")]);
@@ -59,8 +63,35 @@ test("failed attendance queries can be retried", async () => {
     attendance_sessions: { async findMany() { return []; } },
     shift_assignments: { async findMany() { return []; } },
     leave_days: { async findMany() { return []; } },
+    roster_entries: { async findMany() { return []; } },
+    calendars: { async findFirst() { return null; } },
   };
   const service = new AttendanceService(db as unknown as DatabaseService);
   await assert.rejects(service.today("business"), /Database unavailable/);
   assert.equal((await service.today("business")).timezone, "UTC");
+});
+
+test("people not expected today show as Day off, not Not checked in", async () => {
+  const time = (hhmm: string) => new Date(`1970-01-01T${hhmm}:00.000Z`);
+  const shift = { id: "s", name: "Day", starts_local: time("09:00"), ends_local: time("18:00"), grace_min: 10, overnight: false, policy_json: {} };
+  const weekday = new Date().getUTCDay() || 7;
+  const others = [1, 2, 3, 4, 5, 6, 7].filter((d) => d !== weekday);
+  const db = (holiday: boolean) => ({
+    businesses: { async findUniqueOrThrow() { return { timezone: "UTC" }; } },
+    attendance_sessions: { async findMany() { return []; } },
+    shift_assignments: { async findMany() { return [
+      { employee_id: "works-today", shift_id: "s", weekly_pattern: [1, 2, 3, 4, 5, 6, 7], shift_id_ref: shift },
+      { employee_id: "weekly-off", shift_id: "s", weekly_pattern: others, shift_id_ref: shift },
+      { employee_id: "rostered-off", shift_id: "s", weekly_pattern: [1, 2, 3, 4, 5, 6, 7], shift_id_ref: shift },
+    ]; } },
+    leave_days: { async findMany() { return []; } },
+    roster_entries: { async findMany() { return [{ employee_id: "rostered-off", work_date: new Date(new Date().toISOString().slice(0, 10)), shift_id_ref: null }]; } },
+    calendars: { async findFirst() { return holiday ? { id: "h" } : null; } },
+  });
+  const today = await new AttendanceService(db(false) as unknown as DatabaseService).today("business");
+  assert.equal(today.snapshotOf("works-today").status, "Not checked in");
+  assert.equal(today.snapshotOf("weekly-off").status, "Day off");
+  assert.equal(today.snapshotOf("rostered-off").status, "Day off");
+  const onHoliday = await new AttendanceService(db(true) as unknown as DatabaseService).today("business");
+  assert.equal(onHoliday.snapshotOf("works-today").status, "Day off", "nobody is expected on a holiday");
 });

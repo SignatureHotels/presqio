@@ -1,7 +1,7 @@
 export type AttendanceAction = "CHECK_IN" | "CHECK_OUT";
 /** Display categories; persisted verification states are validated by the backend. */
 export type AttendanceStatus =
-  "Present" | "Late" | "Not checked in" | "On leave";
+  "Present" | "Late" | "Not checked in" | "On leave" | "Day off";
 export interface AttendanceSnapshot {
   status: AttendanceStatus;
   checkIn: string | null;
@@ -12,6 +12,9 @@ export interface AttendanceSummary {
   late: number;
   leave: number;
   waiting: number;
+  /** Not expected today: rostered off, a weekly off or a holiday. */
+  off?: number;
+  /** Present as a share of those expected today (everyone not on a day off). */
   rate: number;
 }
 

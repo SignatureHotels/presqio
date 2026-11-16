@@ -117,6 +117,7 @@ export const te: Record<MessageKey, string> = {
   "status.Late": "ఆలస్యం",
   "status.Not checked in": "చెక్ ఇన్ కాలేదు",
   "status.On leave": "సెలవులో",
+  "status.Day off": "సెలవు రోజు",
   "status.Pending": "పెండింగ్",
   "status.Approved": "ఆమోదించారు",
   "status.Rejected": "తిరస్కరించారు",

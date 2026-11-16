@@ -7,6 +7,7 @@ export function StatusChip({ status, label }: { status: string; label?: string }
         Late: "warning",
         "Not checked in": "neutral",
         "On leave": "accent",
+        "Day off": "neutral",
         Pending: "warning",
         Approved: "success",
         Rejected: "error",

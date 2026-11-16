@@ -117,6 +117,7 @@ export const hi: Record<MessageKey, string> = {
   "status.Late": "देर से",
   "status.Not checked in": "चेक इन नहीं",
   "status.On leave": "छुट्टी पर",
+  "status.Day off": "छुट्टी का दिन",
   "status.Pending": "बाक़ी",
   "status.Approved": "मंज़ूर",
   "status.Rejected": "नामंज़ूर",

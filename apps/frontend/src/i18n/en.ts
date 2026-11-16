@@ -115,6 +115,7 @@ export const en = {
   "status.Late": "Late",
   "status.Not checked in": "Not checked in",
   "status.On leave": "On leave",
+  "status.Day off": "Day off",
   "status.Pending": "Pending",
   "status.Approved": "Approved",
   "status.Rejected": "Rejected",
