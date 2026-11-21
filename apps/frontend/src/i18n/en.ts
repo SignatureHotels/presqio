@@ -17,6 +17,12 @@ export const en = {
   "signin.busy": "Signing in…",
   "signin.foot": "No smartphone? Sign in on a colleague's phone, then sign out when you're done.",
 
+  "install.title": "Get the Presqio app",
+  "install.subtitle": "Check in from your home screen, one tap away.",
+  "install.iosSteps": "Tap Share, then “Add to Home Screen”.",
+  "install.button": "Install",
+  "install.later": "Not now",
+
   "greet.morning": "Good morning",
   "greet.afternoon": "Good afternoon",
   "greet.evening": "Good evening",

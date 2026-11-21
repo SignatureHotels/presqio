@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Alert, Button, TextField } from "@mui/material";
 import { errorText, useT } from "@/i18n";
 import { LanguagePicker } from "@/i18n/LanguagePicker";
+import { InstallAppCard } from "../../components/install-app";
 import { useEmployeeSession } from "../../context/employee-session";
 import { rememberedLogin } from "../../utils/remembered-login";
 import { Foot, Form, Hero, Screen } from "./SignInPage.style";
@@ -49,6 +50,7 @@ export function SignInPage() {
           {busy ? t("signin.busy") : t("signin.button")}
         </Button>
       </Form>
+      <InstallAppCard />
       <Foot>{t("signin.foot")}</Foot>
     </Screen>
   );

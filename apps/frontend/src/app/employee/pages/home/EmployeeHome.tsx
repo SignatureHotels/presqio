@@ -6,6 +6,7 @@ import { Icon } from "@/components";
 import { zoneLabel } from "@/utils/dates";
 import { useT } from "@/i18n";
 import { useEmployeeSession } from "../../context/employee-session";
+import { InstallAppCard } from "../../components/install-app";
 import { MobileShell } from "../../components/mobile-shell";
 import { Panel, SectionRow } from "../../EmployeeApp.style";
 import {
@@ -157,6 +158,7 @@ export function EmployeeHome() {
           {t("home.switch")}
         </button>
       </SwitchRow>
+      <InstallAppCard />
 
       <Panel>
         <SectionRow>

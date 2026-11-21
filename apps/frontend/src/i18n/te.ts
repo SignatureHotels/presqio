@@ -19,6 +19,12 @@ export const te: Record<MessageKey, string> = {
   "signin.busy": "సైన్ ఇన్ అవుతోంది…",
   "signin.foot": "స్మార్ట్‌ఫోన్ లేదా? సహోద్యోగి ఫోన్‌లో సైన్ ఇన్ చేసి, పని అయ్యాక సైన్ అవుట్ చేయండి.",
 
+  "install.title": "Presqio యాప్ పొందండి",
+  "install.subtitle": "హోమ్ స్క్రీన్ నుండి ఒక్క ట్యాప్‌తో చెక్ ఇన్ చేయండి.",
+  "install.iosSteps": "షేర్ నొక్కి, “హోమ్ స్క్రీన్‌కు జోడించు” ఎంచుకోండి.",
+  "install.button": "ఇన్‌స్టాల్ చేయండి",
+  "install.later": "ఇప్పుడు కాదు",
+
   "greet.morning": "శుభోదయం",
   "greet.afternoon": "నమస్కారం",
   "greet.evening": "శుభ సాయంత్రం",

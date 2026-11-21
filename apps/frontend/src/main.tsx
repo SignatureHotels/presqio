@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "@/app/App";
 import { AppProvider } from "@/providers/app-provider";
+import "@/utils/install-app"; // listens for Chrome's one-time install event from startup
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AppProvider>

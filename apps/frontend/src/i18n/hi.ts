@@ -19,6 +19,12 @@ export const hi: Record<MessageKey, string> = {
   "signin.busy": "साइन इन हो रहा है…",
   "signin.foot": "स्मार्टफ़ोन नहीं है? किसी साथी के फ़ोन पर साइन इन करें, और काम होने पर साइन आउट कर दें।",
 
+  "install.title": "Presqio ऐप लें",
+  "install.subtitle": "होम स्क्रीन से एक टैप में चेक इन करें।",
+  "install.iosSteps": "शेयर पर टैप करें, फिर “होम स्क्रीन में जोड़ें”।",
+  "install.button": "इंस्टॉल करें",
+  "install.later": "अभी नहीं",
+
   "greet.morning": "सुप्रभात",
   "greet.afternoon": "नमस्ते",
   "greet.evening": "शुभ संध्या",

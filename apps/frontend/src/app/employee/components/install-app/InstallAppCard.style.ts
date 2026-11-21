@@ -1,0 +1,30 @@
+import { styled } from "@mui/material/styles";
+
+export const Card = styled("section")({
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 12,
+  background: "var(--surface)",
+  border: "1px solid var(--line-soft)",
+  borderRadius: 20,
+  padding: 14,
+  boxShadow: "0 6px 24px rgba(23, 63, 53, 0.05)",
+  "& img": { width: 44, height: 44, borderRadius: 12, flexShrink: 0 },
+  "& .text": { flex: "1 1 160px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2 },
+  "& strong": { fontSize: 15, color: "var(--heading)" },
+  "& small": { fontSize: 13, lineHeight: 1.45, color: "var(--muted)" },
+  "& .actions": { display: "flex", gap: 8, marginLeft: "auto" },
+  "& button": {
+    font: "inherit",
+    fontSize: 14,
+    fontWeight: 800,
+    borderRadius: 12,
+    minHeight: 40,
+    padding: "0 14px",
+    cursor: "pointer",
+  },
+  "& .install": { border: 0, background: "var(--primary)", color: "var(--forest)" },
+  "& .install:disabled": { opacity: 0.6 },
+  "& .later": { border: "1px solid var(--line-soft)", background: "transparent", color: "var(--muted)" },
+});

@@ -1,0 +1,1 @@
+export { InstallAppCard } from "./InstallAppCard";
