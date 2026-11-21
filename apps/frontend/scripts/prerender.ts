@@ -33,7 +33,7 @@ export function renderPage(shell: string, page: PageMeta, opts: { onlyAtPath?: s
     `<meta property="og:image" content="${esc(`${SITE}/logo.png`)}"/>`,
     `<meta name="twitter:card" content="summary"/>`,
     // index.html also opens /admin, /employee, /kiosk...: show its text only on its own page
-    ...(opts.onlyAtPath ? [`<script>if(location.pathname!==${JSON.stringify(opts.onlyAtPath)})document.documentElement.className+=" app-route"</script>`,
+    ...(opts.onlyAtPath ? [`<script src="/app-route.js" data-path="${esc(opts.onlyAtPath)}"></script>`,
       `<style>.app-route #root>.prerendered{display:none}</style>`] : []),
   ].join("");
   if (!/<title>[^<]*<\/title>/.test(shell) || !shell.includes('<div id="root"></div>'))
